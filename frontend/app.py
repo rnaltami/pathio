@@ -1,10 +1,25 @@
-import streamlit as st
-import requests
-from textwrap import dedent
+import os
 import json
 import html
+import requests
+import streamlit as st
+from textwrap import dedent
 from urllib.parse import quote, unquote
-import os
+
+# =========================
+# Backend URL (single source of truth)
+# =========================
+DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
+
+def resolve_backend_url() -> str:
+    # Prefer Streamlit Secrets in the cloud; then env var; then default
+    url = st.secrets.get("BACKEND_URL") or os.getenv("BACKEND_URL") or DEFAULT_BACKEND
+    return url.rstrip("/")
+
+backend_url = resolve_backend_url()
+
+# Optional tiny debug — helps confirm what the app is using in prod
+st.caption(f"Using backend: {backend_url}")
 
 # =====================================================
 # CLEAN CHAT VIEW (open via ?view=chat&prompt=...)
@@ -17,9 +32,6 @@ if qp.get("view") == "chat":
     title = f"How‑to: {seed}" if seed else "How‑to Guide"
     st.set_page_config(page_title=title, page_icon=None, layout="centered")
     st.markdown(f"### {title}")
-
-    
-    backend_url = os.getenv("BACKEND_URL", "https://pathio-c9yz.onrender.com")
 
     st.session_state.setdefault("chat_messages", [])
 
@@ -141,7 +153,7 @@ h3{font-size:14px;font-weight:650;}
 .insights-wrap{margin-top:14px;}
 .insights-grid{
   display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;align-items:start;
-  grid-auto-rows: minmax(60px, auto);  /* cards size to content but don't collapse */
+  grid-auto-rows: minmax(60px, auto);
 }
 @media (max-width:900px){.insights-grid{grid-template-columns:1fr;}}
 
@@ -149,10 +161,10 @@ h3{font-size:14px;font-weight:650;}
 .card{
   background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;
   display:flex;flex-direction:column;align-items:stretch;gap:8px;
-  min-height:120px;                 /* stop super-short cards from collapsing */
+  min-height:120px;
   overflow:hidden;
 }
-.card + .card{margin-top:0;}        /* grid gap handles spacing */
+.card + .card{margin-top:0;}
 
 /* Score bar */
 .score-box{margin-bottom:8px;}
@@ -171,34 +183,13 @@ h3{font-size:14px;font-weight:650;}
 
 /* Add breathing room at the very bottom */
 .block-container::after{content:"";display:block;height:90px;}
-/* --- Fix ATS card overlap + spacing --- */
-.insights-grid{
-  margin-bottom: 20px;              /* push content after grid down */
-  grid-auto-rows: minmax(120px, auto);  /* cards don't collapse */
-}
-
-.card{ 
-  position: relative;
-  min-height: 140px;                /* ensure enough height even with 1 line */
-  overflow: hidden;
-}
-
-.card .stMarkdown p:last-child,
-.card [data-testid="stMarkdownContainer"] p:last-child{
-  margin-bottom: 0;                 /* avoid extra collapse inside cards */
-}
-
-/* Ensure the “Be a better candidate” section starts below the grid */
-.be-better{
-  clear: both;
-  margin-top: 20px;
-}
-
-/* (Optional) If your ATS card has its own class, enforce a min height */
+/* Fix ATS card overlap + spacing */
+.insights-grid{ margin-bottom: 20px; grid-auto-rows: minmax(120px, auto); }
+.card{ position: relative; min-height: 140px; overflow: hidden; }
+.card .stMarkdown p:last-child, .card [data-testid="stMarkdownContainer"] p:last-child{ margin-bottom: 0; }
+.be-better{ clear: both; margin-top: 20px; }
 .ats-card{ min-height: 160px; }
-
 </style>
-
 """, unsafe_allow_html=True)
 
 # ---------- State ----------
@@ -207,10 +198,7 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-backend_url = "http://127.0.0.1:8000"  # fixed backend URL
-
 # ---------- Inputs ----------
-# Use non-empty labels + collapse to avoid Streamlit warnings
 resume_text = st.text_area(
     "Résumé input",
     key="pasted_resume",
