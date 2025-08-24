@@ -1,0 +1,25 @@
+# backend/.gitignore
+
+# virtual envs
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# testing / type-checking
+.pytest_cache/
+.mypy_cache/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# local secrets
+.env
+
+# app-specific runtime cache
+cache/
