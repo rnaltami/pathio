@@ -4,6 +4,7 @@ from textwrap import dedent
 import json
 import html
 from urllib.parse import quote, unquote
+import os
 
 # =====================================================
 # CLEAN CHAT VIEW (open via ?view=chat&prompt=...)
@@ -17,7 +18,7 @@ if qp.get("view") == "chat":
     st.set_page_config(page_title=title, page_icon=None, layout="centered")
     st.markdown(f"### {title}")
 
-    import os
+    
     backend_url = os.getenv("BACKEND_URL", "https://pathio-c9yz.onrender.com")
 
     st.session_state.setdefault("chat_messages", [])
