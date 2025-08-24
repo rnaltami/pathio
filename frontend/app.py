@@ -17,7 +17,9 @@ if qp.get("view") == "chat":
     st.set_page_config(page_title=title, page_icon=None, layout="centered")
     st.markdown(f"### {title}")
 
-    backend_url = "https://pathio-c9yz.onrender.com"
+    import os
+    backend_url = os.getenv("BACKEND_URL", "https://pathio-c9yz.onrender.com")
+
     st.session_state.setdefault("chat_messages", [])
 
     # Optional: tiny local fallback so you can demo even if /coach isn't built yet
