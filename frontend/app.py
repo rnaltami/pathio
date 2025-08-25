@@ -10,24 +10,10 @@ from urllib.parse import quote, unquote
 # Backend URL (single source of truth)
 # =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
-
-def resolve_backend_url() -> str:
-    # Prefer Streamlit Secrets in the cloud; then env var; then default
-    env_val = os.getenv("BACKEND_URL")
-    if env_val:
-        return env_val.rstrip("/")
-    
-    #2) fall back to Streamlit Secrets (works on Streamlit Cloud)
-    try:
-        secret_val = st.secrets.get("BACKEND_URL")
-    except Exception:
-        secret_val = None
-    return (secret_val or DEFAULT_BACKEND).rstrip("/")
-
-backend_url = resolve_backend_url()
+backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 
 # Optional tiny debug — helps confirm what the app is using in prod
-#st.caption(f"Using backend: {backend_url}")
+# st.caption(f"Using backend: {backend_url}")
 
 # =====================================================
 # CLEAN CHAT VIEW (open via ?view=chat&prompt=...)
@@ -130,7 +116,7 @@ st.markdown("""
 
 /* Base + push content below Streamlit header */
 html,body,[data-testid="stAppViewContainer"]{background:var(--bg)!important;color:var(--text)!important;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial!important;line-height:1.35;font-size:var(--fs-3);}
-.block-container{padding-top:60px!important;padding-bottom:16px!important;}
+.block-container{padding-top:60px!important;padding-bottom:22px!important;}
 /* Optional: hide Streamlit's top bar */
 /* header{visibility:hidden;} */
 
@@ -148,31 +134,30 @@ h3{font-size:14px;font-weight:650;}
   background:var(--panel)!important;color:var(--text)!important;border:1px solid var(--border)!important;
   border-radius:var(--radius)!important;padding:10px 12px;font-size:var(--fs-2);
 }
-.stTextArea textarea{min-height:140px!important;max-height:220px!important;line-height:1.4!important;resize:vertical;}
+.stTextArea textarea{min-height:160px!important;max-height:180px!important;line-height:1.5!important;resize:vertical;}
 
-/* Buttons */
+/* Primary action button */
 .stButton button{
-  background:#fff!important;color:#222!important;border:1px solid var(--border)!important;
-  border-radius:12px!important;padding:8px 12px;font-size:var(--fs-2);font-weight:560;cursor:pointer;
+  background:var(--accent)!important;color:#fff!important;border:none!important;
+  border-radius:999px!important;padding:10px 20px!important;font-size:var(--fs-2);font-weight:600;cursor:pointer;
+  transition:background .2s ease;
 }
-.stButton button:hover{background:#f9f9f9!important;}
+.stButton button:hover{background:#254eda!important;}
 
-/* Insights layout: prevent overlap/bleed */
+/* Card wrapper */
+.card{
+  background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;
+  display:flex;flex-direction:column;gap:8px;min-height:120px;overflow:hidden;
+}
+.card + .card{margin-top:10px;}
+
+/* Insights layout */
 .insights-wrap{margin-top:14px;}
 .insights-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;align-items:start;
-  grid-auto-rows: minmax(60px, auto);
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;align-items:start;
+  grid-auto-rows:minmax(60px,auto);
 }
 @media (max-width:900px){.insights-grid{grid-template-columns:1fr;}}
-
-/* Cards */
-.card{
-  background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;
-  display:flex;flex-direction:column;align-items:stretch;gap:8px;
-  min-height:120px;
-  overflow:hidden;
-}
-.card + .card{margin-top:0;}
 
 /* Score bar */
 .score-box{margin-bottom:8px;}
@@ -189,16 +174,28 @@ h3{font-size:14px;font-weight:650;}
 .clean-list{margin:0;padding-left:1.05rem;}
 .clean-list li{font-size:var(--fs-1);margin-bottom:4px;}
 
-/* Add breathing room at the very bottom */
+/* Bottom spacer */
 .block-container::after{content:"";display:block;height:90px;}
+
 /* Fix ATS card overlap + spacing */
-.insights-grid{ margin-bottom: 20px; grid-auto-rows: minmax(120px, auto); }
-.card{ position: relative; min-height: 140px; overflow: hidden; }
-.card .stMarkdown p:last-child, .card [data-testid="stMarkdownContainer"] p:last-child{ margin-bottom: 0; }
-.be-better{ clear: both; margin-top: 20px; }
-.ats-card{ min-height: 160px; }
+.insights-grid{ grid-auto-rows:minmax(120px,auto); }
+.card .stMarkdown p:last-child, .card [data-testid="stMarkdownContainer"] p:last-child{ margin-bottom:0; }
+.be-better{ clear:both;margin-top:20px; }
+.ats-card{ min-height:160px; }
 </style>
 """, unsafe_allow_html=True)
+
+# ---------- Brand header ----------
+st.markdown(
+    """
+    <div style="text-align:center; margin: 0 0 18px 0;">
+        <div style="font-size:22px; font-weight:650;">
+            Tailor your résumé to the job you want
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------- State ----------
 st.session_state.setdefault("pasted_resume", "")
@@ -260,13 +257,20 @@ tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
 if tailored:
+    # Tailored résumé
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### Tailored résumé (preview)")
     st.markdown(tailored.get("tailored_resume_md", ""), unsafe_allow_html=False)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+    # Cover letter
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### Cover letter (preview)")
     st.markdown(tailored.get("cover_letter_md", ""), unsafe_allow_html=False)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---- Downloads ABOVE Insights
+    # Downloads
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### Download (.docx)")
     col1, col2 = st.columns(2)
     with col1:
@@ -305,6 +309,7 @@ if tailored:
                 )
             except Exception as e:
                 st.error(f"Export failed: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------- Insights ----------
 if insights:
@@ -388,8 +393,10 @@ if insights:
     </div>
     """).strip()
 
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### Insights")
-    st.components.v1.html(insights_iframe_html, height=420, scrolling=True)
+    st.components.v1.html(insights_iframe_html, height=480, scrolling=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ---------- Be a better candidate (ONLY if backend provides) ----------
     do_now = list((insights or {}).get("do_now") or [])
@@ -401,6 +408,7 @@ if insights:
             href = f"?view=chat&prompt={quote(item_text)}"
             return f"<a class='chip' href='{href}' target='_blank' rel='noopener noreferrer'>Show me how</a>"
 
+        st.markdown('<div class="card be-better">', unsafe_allow_html=True)
         st.markdown("#### Be a better candidate")
         colA, colB = st.columns(2)
 
@@ -421,3 +429,11 @@ if insights:
                         f"• {html.escape(str(text))} {link_for(str(text))}",
                         unsafe_allow_html=True,
                     )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ---------- Optional micro‑footer (uncomment to show) ----------
+# st.markdown(
+#     "<div style='text-align:center; color:#888; font-size:12px; margin-top:16px;'>"
+#     "No data is stored. Refresh clears your inputs."
+#     "</div>", unsafe_allow_html=True
+# )
