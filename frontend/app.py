@@ -13,13 +13,21 @@ DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 
 def resolve_backend_url() -> str:
     # Prefer Streamlit Secrets in the cloud; then env var; then default
-    url = st.secrets.get("BACKEND_URL") or os.getenv("BACKEND_URL") or DEFAULT_BACKEND
-    return url.rstrip("/")
+    env_val = os.getenv("BACKEND_URL")
+    if env_val:
+        return env_val.rstrip("/")
+    
+    #2) fall back to Streamlit Secrets (works on Streamlit Cloud)
+    try:
+        secret_val = st.secrets.get("BACKEND_URL")
+    except Exception:
+        secret_val = None
+    return (secret_val or DEFAULT_BACKEND).rstrip("/")
 
 backend_url = resolve_backend_url()
 
 # Optional tiny debug — helps confirm what the app is using in prod
-st.caption(f"Using backend: {backend_url}")
+#st.caption(f"Using backend: {backend_url}")
 
 # =====================================================
 # CLEAN CHAT VIEW (open via ?view=chat&prompt=...)
