@@ -6,7 +6,7 @@ import streamlit as st
 from textwrap import dedent
 from urllib.parse import quote, unquote
 from pathlib import Path
-
+import base64
 # =========================
 # Backend URL (single source of truth)
 # =========================
@@ -187,15 +187,20 @@ h3{font-size:14px;font-weight:650;}
 """, unsafe_allow_html=True)
 
 # ---------- Brand header ----------
-LOGO = Path(__file__).with_name("pathio-logo.png")
+LOGO = Path(__file__).with_name("pathio-logo.png")  # rename as needed
+logo_b64 = base64.b64encode(LOGO.read_bytes()).decode()
 
 # (optional) runtime check to confirm the file is present in Render
 # st.caption(f"Logo exists: {LOGO.exists()} → {LOGO}")
 
-st.markdown('<div style="text-align:center; margin:0 0 18px 0;">', unsafe_allow_html=True)
-st.image(str(LOGO), width=200)  # change width to taste (e.g., 160–240)
-st.markdown('</div>', unsafe_allow_html=True)
-
+st.markdown(
+    f"""
+    <div style="text-align:center; margin:0 0 12px 0;">
+      <img src="data:image/png;base64,{logo_b64}" alt=":pathio" style="height:18px; width:auto;" />
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------- State ----------
 st.session_state.setdefault("pasted_resume", "")
