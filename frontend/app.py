@@ -5,6 +5,7 @@ import requests
 import streamlit as st
 from textwrap import dedent
 from urllib.parse import quote, unquote
+from pathlib import Path
 
 # =========================
 # Backend URL (single source of truth)
@@ -24,7 +25,7 @@ if qp.get("view") == "chat":
 
     # Page setup for the chat view only
     title = f"How‑to: {seed}" if seed else "How‑to Guide"
-    st.set_page_config(page_title=title, page_icon=None, layout="centered")
+    st.set_page_config(page_title=title, page_icon="pathio-logo.png", layout="centered")
     st.markdown(f"### {title}")
 
     st.session_state.setdefault("chat_messages", [])
@@ -186,14 +187,15 @@ h3{font-size:14px;font-weight:650;}
 """, unsafe_allow_html=True)
 
 # ---------- Brand header ----------
-st.markdown(
-    """
-    <div style="text-align:center; margin: 0 0 18px 0;">
-        <img src="pathio-logo.png" alt="Pathio" style="height:36px; width:auto;">
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+LOGO = Path(__file__).with_name("pathio-logo.png")
+
+# (optional) runtime check to confirm the file is present in Render
+# st.caption(f"Logo exists: {LOGO.exists()} → {LOGO}")
+
+st.markdown('<div style="text-align:center; margin:0 0 18px 0;">', unsafe_allow_html=True)
+st.image(str(LOGO), width=200)  # change width to taste (e.g., 160–240)
+st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ---------- State ----------
 st.session_state.setdefault("pasted_resume", "")
