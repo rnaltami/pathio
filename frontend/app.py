@@ -196,7 +196,7 @@ logo_b64 = base64.b64encode(LOGO.read_bytes()).decode()
 st.markdown(
     f"""
     <div style="text-align:center; margin:0 0 12px 0;">
-      <img src="data:image/png;base64,{logo_b64}" alt=":pathio" style="height:18px; width:auto;" />
+      <img src="data:image/png;base64,{logo_b64}" alt=":pathio" style="height:28px; width:auto;" />
     </div>
     """,
     unsafe_allow_html=True,
