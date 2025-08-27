@@ -105,7 +105,7 @@ if qp.get("view") == "chat":
 # =====================================================
 # MAIN APP (Tailor → Download → Insights → Actions)
 # =====================================================
-st.set_page_config(page_title="Pathio", page_icon=None, layout="centered")
+st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 st.markdown("""
 <style>
 :root{
@@ -189,9 +189,7 @@ h3{font-size:14px;font-weight:650;}
 st.markdown(
     """
     <div style="text-align:center; margin: 0 0 18px 0;">
-        <div style="font-size:22px; font-weight:650;">
-            Tailor your résumé to the job you want
-        </div>
+        <img src="pathio-logo.png" alt="Pathio" style="height:36px; width:auto;">
     </div>
     """,
     unsafe_allow_html=True,
