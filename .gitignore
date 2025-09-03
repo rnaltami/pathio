@@ -1,0 +1,30 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.pot
+*.pyc
+*.so
+*.egg-info/
+dist/
+build/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+frontend/.venv/
+backend/.venv/
+
+# ---- Streamlit ----
+.streamlit/
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+
+# ---- IDEs ----
+.vscode/
+.idea/
+*.swp

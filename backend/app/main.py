@@ -4,6 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# NEW: load .env very early, so quick.py sees env vars at import time
+try:
+    from dotenv import load_dotenv
+    # .env is in backend/, and this file is backend/app/main.py
+    load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=False)
+except Exception:
+    pass
+
 # Routers
 from .routers.quick import router as quick_router
 try:

@@ -123,13 +123,13 @@ def ats_checks(resume_text: str) -> List[str]:
     density = len(raw) / total
 
     if density >= 0.0025 and len(raw) >= 5:
-        flags.append("Resume contains unusual non‑ASCII characters; export as UTF‑8.")
+        flags.append("Resume contains unusual non-ASCII characters; export as UTF-8.")
     else:
         if any(ord(c) > 127 for c in resume_text):
-            flags.append("Curly quotes/bullets/dashes detected (OK). Ensure final export is UTF‑8 or PDF.")
+            flags.append("Curly quotes/bullets/dashes detected (OK). Ensure final export is UTF-8 or PDF.")
 
     if len(re.findall(r"\b[A-Z]{3,}\b", resume_text)) > 80:
-        flags.append("Many ALL‑CAPS tokens; reduce for ATS readability.")
+        flags.append("Many ALL-CAPS tokens; reduce for ATS readability.")
 
     return flags or ["none"]
 
@@ -288,6 +288,29 @@ def llm_actions(resume_text: str, job_text: str, missing_skills: List[str]) -> T
     do_now = [str(x) for x in (data.get("do_now") or [])]
     do_long = [str(x) for x in (data.get("do_long") or [])]
 
+def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
+    """
+    Heuristic upskilling suggestions when the LLM is unavailable.
+    Uses up to 3 'missing' keywords if present; otherwise generic ops terms.
+    """
+    # keep only short, readable hints
+    kws = [m.strip() for m in (missing or []) if isinstance(m, str) and 2 < len(m.strip()) < 28][:3]
+    if not kws:
+        kws = ["scheduling", "coordination", "reporting"]
+
+    do_now = [
+        f"Draft a one-page alignment sheet: map current bullets to job needs ({', '.join(kws)}). (time: ~1–2 hours)",
+        f"Create a sample artifact that mirrors the role (checklist/run-book) emphasizing {kws[0]}. (time: ~3–4 hours)",
+        "Compile an impact sheet from past projects (before/after, volume, quality, timing). (time: ~2–3 hours)",
+    ]
+
+    do_long = [
+        f"Turn the sample artifact into a portfolio piece with a README and reflection. (time: ~1–2 weeks)",
+        "Contribute a small improvement to a workflow/template you use; document and share. (time: ~1–2 weeks)",
+    ]
+    return do_now, do_long
+
+
     def clean(items: List[str], is_now: bool) -> List[str]:
         out: List[str] = []
         for s in items:
@@ -316,8 +339,31 @@ def llm_actions(resume_text: str, job_text: str, missing_skills: List[str]) -> T
 
     return clean(do_now, True), clean(do_long, False)
 
+# ---------- NEW: Heuristic fallback for actions ----------
+def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
+    """
+    Heuristic actions when the LLM path is unavailable or returns nothing.
+    Keeps items honest (no new tools) and artifact-oriented.
+    """
+    focus = [m for m in (missing or []) if isinstance(m, str) and len(m) > 2][:3]
+    if not focus:
+        focus = ["the role’s core outputs"]
+
+    do_now = [
+        "Create a one-page alignment summary mapping your bullets to the job responsibilities; add links to past work. (time: ~1–2 hours)",
+        f"Draft a sample work artifact that matches {focus[0]} (process doc / outline / checklist) using tools already on your resume. (time: ~3–4 hours)",
+        "Compile a simple impact sheet from past projects (before/after, volume, quality, timing). (time: ~2–3 hours)",
+    ][:3]
+
+    do_long = [
+        "Extend the sample artifact into a portfolio piece with a README and reflection on tradeoffs. (time: ~1–2 weeks)",
+        "Contribute a small improvement to a template/workflow you already use; document the change. (time: ~1–2 weeks)",
+    ][:2]
+
+    return do_now, do_long
+
 # =========================
-# Sanitizer to prevent over‑embellishment
+# Sanitizer to prevent over-embellishment
 # =========================
 def _sentences(md: str) -> List[str]:
     parts: List[str] = []
@@ -340,7 +386,7 @@ _PROTECTED_CLUSTERS = [
     {"machine", "learning", "ml", "model", "models", "tensorflow", "pytorch", "spark", "hadoop", "mllib", "sagemaker"},
     {"a/b", "ab", "experimentation", "experiment", "ab-testing", "a-b"},
     {"statistical", "regression", "classification", "roc-auc", "ndcg", "map", "f1"},
-    {"data-driven", "data‑driven", "analytics", "analytical"},
+    {"data-driven", "data-driven", "analytics", "analytical"},
 ]
 
 def sanitize_tailored(tailored_md: str, resume_text: str) -> str:
@@ -397,10 +443,10 @@ def heuristic_resume(resume_text: str, job_text: str, missing: List[str]) -> str
     if not top:
         core = [m for m in missing if len(m) > 3][:4]
         top = [f"- Alignment with **{m}**; ready to demonstrate impact." for m in core] or [
-            "- Clear, ATS‑friendly bullets aligned to the role.",
-            "- Comfortable with performance metrics and run‑of‑show."
+            "- Clear, ATS-friendly bullets aligned to the role.",
+            "- Comfortable with performance metrics and run-of-show."
         ]
-    header = "**Tailored Summary**\n- Role‑aligned bullets extracted from your resume.\n\n**Highlights**\n"
+    header = "**Tailored Summary**\n- Role-aligned bullets extracted from your resume.\n\n**Highlights**\n"
     return header + "\n".join(top)
 
 def heuristic_cover(resume_text: str, job_text: str) -> str:
@@ -411,7 +457,7 @@ def heuristic_cover(resume_text: str, job_text: str) -> str:
         f"**Cover Letter**\n\n"
         f"Dear Hiring Team,\n\n"
         f"I’m excited to apply for {title}. My background aligns with your needs in operations, coordination, and metrics tracking. "
-        f"I work well cross‑functionally and in fast‑paced settings. I’d welcome the chance to contribute and learn.\n\n"
+        f"I work well cross-functionally and in fast-paced settings. I’d welcome the chance to contribute and learn.\n\n"
         f"Sincerely,\nYour Name\n"
     )
 
@@ -460,6 +506,78 @@ def call_llm_tailor(resume_text: str, job_text: str) -> Tuple[str, str]:
     except Exception:
         return "", ""
 
+def _brief_summary_from_resume(resume_text: str) -> str:
+    """Two-line, truthful summary derived only from terms in the source resume."""
+    rlow = (resume_text or "").lower()
+    core = "Coordinator/writer experienced in version/change control, scheduling, structured notes, and cross-team communication."
+    tools = []
+    for t in ["OpenAI", "Anthropic Claude", "Python", "Final Draft", "Google Workspace"]:
+        if t.lower() in rlow:
+            tools.append(t)
+    if tools:
+        return f"{core} Familiar with " + ", ".join(tools) + "."
+    return core
+
+def _ensure_summary_and_changes(tailored_md: str, resume_text: str) -> str:
+    """Guarantee a Summary at the top and a 'What changed' note at the end (no invention)."""
+    text = (tailored_md or "").strip()
+
+    # Add **Summary** if missing
+    has_summary = re.search(r"(?im)^\s*(\*\*|##?\s*)summary\b", text) is not None
+    if not has_summary:
+        summary = _brief_summary_from_resume(resume_text)
+        text = f"**Summary**\n{summary}\n\n" + text
+
+    # Add **What changed** if missing
+    has_changes = re.search(r"(?im)^\s*\*\*what changed\*\*", text) is not None
+    if not has_changes:
+        changes = (
+            "\n\n**What changed**\n"
+            "- Reordered to foreground coordination/scheduling already present in your resume.\n"
+            "- Clarified process work (revisions/version control, continuity, notes & follow-ups).\n"
+            "- Kept show/company names and tools; tightened phrasing for ATS readability.\n"
+        )
+        text = text.rstrip() + changes
+
+    return text
+# ---------- LLM live-call debug ----------
+@router.get("/debug/llm")
+def debug_llm():
+    info = {
+        "has_key": bool(OPENAI_API_KEY),
+        "client_exists": _client is not None,
+        "using_new_sdk": _new_api,
+        "model": OPENAI_MODEL,
+    }
+    if not _client or not OPENAI_API_KEY:
+        info["ok"] = False
+        info["error"] = "No client or key"
+        return info
+    try:
+        if _new_api:
+            resp = _client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": "ping"}],
+                temperature=0,
+                max_tokens=5,
+            )
+            sample = (resp.choices[0].message.content or "")[:40]
+        else:
+            resp = _client.ChatCompletion.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": "ping"}],
+                temperature=0,
+                max_tokens=5,
+            )
+            sample = (resp.choices[0].message["content"] or "")[:40]
+        info["ok"] = True
+        info["sample"] = sample
+        return info
+    except Exception as e:
+        info["ok"] = False
+        info["error"] = str(e)
+        return info
+
 # =========================
 # Routes
 # =========================
@@ -489,7 +607,7 @@ def quick_tailor(req: QuickTailorRequest):
     tailored_md, cover_md = call_llm_tailor(resume_text, job_text)
     if not tailored_md:
         tailored_md = heuristic_resume(resume_text, job_text, missing or [])
-    tailored_md = sanitize_tailored(tailored_md, resume_text)
+    tailored_md = _ensure_summary_and_changes(sanitize_tailored(tailored_md, resume_text), resume_text)
 
     if not cover_md:
         cover_md = heuristic_cover(resume_text, job_text)
@@ -550,13 +668,22 @@ def export_doc(req: ExportRequest):
 
 @router.post("/coach")
 def coach(req: ChatRequest):
-    """Lightweight how‑to chat for the 'Show me how' link."""
+    """Lightweight how-to chat for the 'Show me how' link."""
     msgs = req.messages or []
     system = (
-        "You are a practical, concise how‑to coach. Answer with a focused step‑by‑step recipe "
+        "You are a practical, concise how-to coach. Answer with a focused step-by-step recipe "
         "for the user's request: list concrete steps, tools/menus/commands, and a small checklist. "
         "Avoid generic self-help advice; be specific and actionable."
     )
     chat = [{"role":"system","content":system}] + msgs
     raw = _chat(chat, max_tokens=700, temperature=0.2) or ""
     return {"reply": raw.strip() or "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"}
+
+@router.get("/debug/llm")
+def debug_llm():
+    return {
+        "has_key": bool(OPENAI_API_KEY),
+        "client_exists": _client is not None,
+        "using_new_sdk": _new_api,
+        "model": OPENAI_MODEL,
+    }

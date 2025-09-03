@@ -1,43 +1,47 @@
+# app.py (Streamlit defaults — no custom CSS/HTML)
 import os
 import json
 import html
+import hashlib
 import requests
 import streamlit as st
+import re
+
 from textwrap import dedent
 from urllib.parse import quote, unquote
-from pathlib import Path
-import base64
+
 # =========================
 # Backend URL (single source of truth)
 # =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 
-# Optional tiny debug — helps confirm what the app is using in prod
-# st.caption(f"Using backend: {backend_url}")
+# Tiny debug so you can confirm which backend is in use
+st.caption(f"Using backend: {backend_url}")
 
 # =====================================================
-# CLEAN CHAT VIEW (open via ?view=chat&prompt=...)
+# ALT VIEWS
 # =====================================================
-qp = st.query_params  # Streamlit modern API
+qp = st.query_params
+
+# ----- Chat helper view (?view=chat&prompt=...) -----
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-
-    # Page setup for the chat view only
-    title = f"How‑to: {seed}" if seed else "How‑to Guide"
+    title = f"How-to: {seed}" if seed else "How-to Guide"
     st.set_page_config(page_title=title, page_icon="pathio-logo.png", layout="centered")
-    st.markdown(f"### {title}")
+
+    st.title(title)
+    st.divider()
 
     st.session_state.setdefault("chat_messages", [])
 
-    # Optional: tiny local fallback so you can demo even if /coach isn't built yet
     def fallback_steps(prompt: str) -> str:
         t = prompt.lower()
         if "obs" in t or "live" in t:
             return (
                 "**Quick plan:**\n"
                 "1) Install OBS; add mic + screen in a Scene.\n"
-                "2) Settings → Output: 720p/30fps; record a 3‑min dry run.\n"
+                "2) Settings → Output: 720p/30fps; record a 3-min dry run.\n"
                 "3) Watch back; note 3 fixes (audio, framing, hook).\n"
                 "4) Apply fixes; record a second take; save with notes.\n"
             )
@@ -48,7 +52,6 @@ if qp.get("view") == "chat":
             "3) Save evidence (doc/clip) and iterate once.\n"
         )
 
-    # Seed first turn if arriving with a prompt (append only; render later to avoid duplicates)
     if seed and not st.session_state["chat_messages"]:
         st.session_state["chat_messages"].append({"role": "user", "content": seed})
         with st.spinner("Thinking…"):
@@ -60,25 +63,18 @@ if qp.get("view") == "chat":
                 )
                 r.raise_for_status()
                 data = r.json()
-                reply = (data.get("reply") or "").strip()
-                if not reply:
-                    reply = fallback_steps(seed)
+                reply = (data.get("reply") or "").strip() or fallback_steps(seed)
             except Exception:
                 reply = fallback_steps(seed)
         st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
 
-    # --- Render full history ---
     for m in st.session_state["chat_messages"]:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
 
-    # --- Follow‑ups ---
-    user_msg = st.chat_input("Ask a follow‑up…")
+    user_msg = st.chat_input("Ask a follow-up…")
     if user_msg:
-        # 1) add user turn
         st.session_state["chat_messages"].append({"role": "user", "content": user_msg})
-
-        # 2) call backend
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
@@ -89,115 +85,119 @@ if qp.get("view") == "chat":
                     )
                     r.raise_for_status()
                     data = r.json()
-                    reply = (data.get("reply") or "").strip()
-                    if not reply:
-                        reply = "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"
+                    reply = (data.get("reply") or "").strip() or (
+                        "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"
+                    )
                 except Exception:
                     reply = "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"
             st.markdown(reply)
-
-        # 3) persist assistant turn, then rerun to show full thread
         st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
         st.rerun()
 
-    # Prevent the main UI from rendering in chat view
+    st.stop()
+
+# ----- Future jobs placeholder (?view=future) -----
+if qp.get("view") == "future":
+    st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
+    st.title("Explore future jobs")
+    st.info("This page is coming soon. (You landed here via the link under the job box.)")
     st.stop()
 
 # =====================================================
-# MAIN APP (Tailor → Download → Insights → Actions)
+# MAIN APP (Streamlit default styling)
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
-st.markdown("""
-<style>
-:root{
-  --bg:#fff; --text:#111; --muted:#666; --accent:#3366ff;
-  --border:#e6e6e6; --panel:#f7f7f7; --radius:10px;
-  --fs-0:12px; --fs-1:13px; --fs-2:14px; --fs-3:15px;
-}
 
-/* Base + push content below Streamlit header */
-html,body,[data-testid="stAppViewContainer"]{background:var(--bg)!important;color:var(--text)!important;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial!important;line-height:1.35;font-size:var(--fs-3);}
-.block-container{padding-top:60px!important;padding-bottom:22px!important;}
-/* Optional: hide Streamlit's top bar */
-/* header{visibility:hidden;} */
-
-/* Keep headings small everywhere (incl. markdown previews) */
-h1,h2,h3{margin:0 0 8px;}
-h1{font-size:20px;font-weight:650;}
-h2{font-size:16px;font-weight:650;}
-h3{font-size:14px;font-weight:650;}
-[data-testid="stMarkdownContainer"] h1{font-size:20px;}
-[data-testid="stMarkdownContainer"] h2{font-size:16px;}
-[data-testid="stMarkdownContainer"] h3{font-size:14px;}
-
-/* Inputs */
-.stTextInput input,.stTextArea textarea{
-  background:var(--panel)!important;color:var(--text)!important;border:1px solid var(--border)!important;
-  border-radius:var(--radius)!important;padding:10px 12px;font-size:var(--fs-2);
-}
-.stTextArea textarea{min-height:160px!important;max-height:180px!important;line-height:1.5!important;resize:vertical;}
-
-/* Primary action button */
-.stButton button{
-  background:var(--accent)!important;color:#fff!important;border:none!important;
-  border-radius:999px!important;padding:10px 20px!important;font-size:var(--fs-2);font-weight:600;cursor:pointer;
-  transition:background .2s ease;
-}
-.stButton button:hover{background:#254eda!important;}
-
-/* Card wrapper */
-.card{
-  background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;
-  display:flex;flex-direction:column;gap:8px;min-height:120px;overflow:hidden;
-}
-.card + .card{margin-top:10px;}
-
-/* Insights layout */
-.insights-wrap{margin-top:14px;}
-.insights-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;align-items:start;
-  grid-auto-rows:minmax(60px,auto);
-}
-@media (max-width:900px){.insights-grid{grid-template-columns:1fr;}}
-
-/* Score bar */
-.score-box{margin-bottom:8px;}
-.score-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
-.score-label{font-size:var(--fs-1);color:var(--muted);}
-.score-badge{font-size:var(--fs-1);font-weight:600;}
-.score-bar{width:100%;height:5px;background:#eee;border-radius:999px;}
-.score-fill{height:5px;background:var(--accent);border-radius:999px;}
-
-/* Pills/list */
-.pills{display:flex;flex-wrap:wrap;gap:6px;}
-.pill{background:#f1f1f1;border:1px solid var(--border);border-radius:999px;padding:3px 8px;font-size:12px;}
-.pill.warn{background:#fff7df;border-color:#f2e3b5;}
-.clean-list{margin:0;padding-left:1.05rem;}
-.clean-list li{font-size:var(--fs-1);margin-bottom:4px;}
-
-/* Bottom spacer */
-.block-container::after{content:"";display:block;height:90px;}
-
-/* Fix ATS card overlap + spacing */
-.insights-grid{ grid-auto-rows:minmax(120px,auto); }
-.card .stMarkdown p:last-child, .card [data-testid="stMarkdownContainer"] p:last-child{ margin-bottom:0; }
-.be-better{ clear:both;margin-top:20px; }
-.ats-card{ min-height:160px; }
-</style>
-""", unsafe_allow_html=True)
-
-# ---------- Brand header ----------
-LOGO = Path(__file__).with_name("pathio-logo.png")  # rename as needed
-logo_b64 = base64.b64encode(LOGO.read_bytes()).decode()
-
-# (optional) runtime check to confirm the file is present in Render
-# st.caption(f"Logo exists: {LOGO.exists()} → {LOGO}")
-
+# ---------- Header ----------
 st.markdown(
-    f"""
-    <div style="text-align:center; margin:0 0 12px 0;">
-      <img src="data:image/png;base64,{logo_b64}" alt=":pathio" style="height:28px; width:auto;" />
+    """
+    <div style="text-align:center; margin-bottom:1.5rem;">
+        <div style="font-size:42px; font-weight:700; margin-bottom:4px;">
+            :PATHIO
+        </div>
+        <p class="tagline">
+            Tailor your résumé for the job.
+        </p>
     </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ---------- Global Styles ----------
+st.markdown(
+    """
+    <style>
+      /* ========= Typographic scale ========= */
+      /* Big: logo handled inline (42px) */
+      /* Medium: tagline, buttons, section titles */
+      .tagline,
+      .stButton button,
+      .section-title {
+        font-size:16px !important;
+        font-weight:600 !important;  /* titles a touch bolder */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+          Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
+      }
+
+      /* Small: user-entered text & captions */
+      textarea, .stTextInput input {
+        font-size:13px !important;
+        font-weight:400 !important;
+      }
+
+      /* Placeholder text = medium */
+      textarea::placeholder,
+      .stTextInput input::placeholder {
+        font-size:16px !important;
+        font-weight:400 !important;
+        opacity:0.75;
+      }
+
+      /* Captions = even smaller */
+      .stCaption, footer, .stMarkdown small {
+        font-size:12px !important;
+        opacity:0.8;
+      }
+
+      /* ========= Result boxes ========= */
+      .result-box {
+        padding:12px 14px;
+        border-radius:10px;
+        border:1px solid rgba(0,0,0,0.08);
+        margin:8px 0 18px 0;
+      }
+      @media (prefers-color-scheme: light) {
+        .result-box { background:#f7f9ff; } /* light indigo tint */
+      }
+      @media (prefers-color-scheme: dark) {
+        .result-box { background:#111827; border-color:rgba(255,255,255,0.08); }
+      }
+
+      /* Make everything INSIDE the result box small & tight */
+      .result-box * {
+        font-size:13px !important;
+        line-height:1.5 !important;
+        margin-top:0.25rem;
+        margin-bottom:0.25rem;
+      }
+      .result-box h1, .result-box h2, .result-box h3,
+      .result-box h4, .result-box h5, .result-box h6 {
+        font-size:13.5px !important;
+        font-weight:600 !important;
+        margin-top:0.35rem !important;
+        margin-bottom:0.35rem !important;
+      }
+
+      /* Section titles (use instead of st.subheader for medium size) */
+      .section-title { margin:14px 0 6px 0; }
+
+      /* Normalize global markdown heading sizes (outside boxes) */
+      .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        font-size:16px !important;
+        font-weight:600 !important;
+        margin:12px 0 6px 0 !important;
+      }
+    </style>
     """,
     unsafe_allow_html=True,
 )
@@ -208,26 +208,35 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
+# If we have results, hide the tagline via CSS
+if st.session_state.get("tailored"):
+    st.markdown("<style>.tagline{display:none !important;}</style>", unsafe_allow_html=True)
+
 # ---------- Inputs ----------
-resume_text = st.text_area(
-    "Résumé input",
-    key="pasted_resume",
-    height=100,
-    placeholder="Paste your résumé / CV",
-    label_visibility="collapsed",
-)
 job_text = st.text_area(
     "Job description input",
     key="pasted_job",
-    height=100,
-    placeholder="Paste the job you want",
+    height=120,
+    placeholder="Paste job listing.",
+    label_visibility="collapsed",
+)
+st.markdown(
+    "<div style='text-align:right; font-size:13px; margin-top:-8px;'>"
+    "<a href='?view=future' style='text-decoration:none;'>explore jobs →</a>"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+resume_text = st.text_area(
+    "Résumé input",
+    key="pasted_resume",
+    height=160,
+    placeholder="Paste résumé.",
     label_visibility="collapsed",
 )
 
-st.markdown("---")
-
-# ---------- Tailor ----------
-if st.button("✨ Make it fit"):
+# ---------- Tailor (button + handler) ----------
+if st.button("Update résumé + create cover letter", key="cta"):
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
     if not resume_txt or not job_txt:
@@ -237,7 +246,7 @@ if st.button("✨ Make it fit"):
         )
     else:
         try:
-            with st.spinner("Tailoring…"):
+            with st.spinner("Updating…"):
                 payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
                 r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
                 if r.status_code != 200:
@@ -257,64 +266,155 @@ if st.button("✨ Make it fit"):
         except Exception as e:
             st.exception(e)
 
+# Only show the helper line until results exist
+if not st.session_state.get("tailored"):
+    st.caption("＋ insights and clear steps to improve your match for the role.")
+
+# ---------- Helper: split out "What changed" ----------
+def split_what_changed(md: str):
+    """
+    Split the tailored resume Markdown into (main_md, changes_md).
+    If no 'What changed' section is present, returns (md, None).
+    """
+    if not md:
+        return "", None
+    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
+    if not m:
+        return md, None
+    main_md = md[:m.start()].rstrip()
+    changes_md = md[m.start():].lstrip()  # keep the **What changed** header
+    return main_md, changes_md
+
+# ---------- Helper: split out "**Summary**" to its own card ----------
+def split_summary(md: str):
+    """
+    Find a '**Summary**' header and return (summary_md, rest_md).
+    We treat the summary as the header plus its following bullet block.
+    If no summary found, returns (None, md).
+    """
+    if not md:
+        return None, md
+    lines = md.splitlines()
+    start = None
+    # locate the line that is exactly '**Summary**' (case-insensitive)
+    for i, line in enumerate(lines):
+        if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
+            start = i
+            break
+    if start is None:
+        return None, md
+
+    # collect the bullet block after the header
+    end = start + 1
+    saw_bullet = False
+    while end < len(lines):
+        s = lines[end].strip()
+        if s == "":
+            end += 1
+            continue
+        if s.startswith(("-", "•", "*")):
+            saw_bullet = True
+            end += 1
+            continue
+        if saw_bullet:
+            break
+        break
+
+    summary_md = "\n".join(lines[start:end]).strip()
+    if summary_md.lower().strip() == "**summary**":
+        return None, md
+
+    rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
+    return summary_md, rest_md
+
 # ---------- Output ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
 if tailored:
-    # Tailored résumé
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### Tailored résumé (preview)")
-    st.markdown(tailored.get("tailored_resume_md", ""), unsafe_allow_html=False)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # --- Résumé (split “What changed”, then split out "Summary") ---
+    resume_md_full = tailored.get("tailored_resume_md", "")
+    main_md, changes_md = split_what_changed(resume_md_full)
+    summary_md, body_md = split_summary(main_md)
 
-    # Cover letter
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### Cover letter (preview)")
+    # Summary card (if present)
+    if summary_md:
+        st.markdown("<div class='section-title'>Summary</div>", unsafe_allow_html=True)
+        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
+        st.markdown(summary_md, unsafe_allow_html=False)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Résumé preview (without the Summary block)
+    st.markdown("<div class='section-title'>Tailored résumé (preview)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='result-box'>", unsafe_allow_html=True)
+    st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Cover letter ---
+    st.markdown("<div class='section-title'>Cover letter (preview)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='result-box'>", unsafe_allow_html=True)
     st.markdown(tailored.get("cover_letter_md", ""), unsafe_allow_html=False)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Downloads
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### Download (.docx)")
+    # --- Downloads (one-click) ---
+    st.markdown("<div class='section-title'>Downloads (.docx)</div>", unsafe_allow_html=True)
+
+    # Use FULL resume for download (includes "What changed"). Change to `body_md` to exclude.
+    resume_md = resume_md_full
+    cover_md  = tailored.get("cover_letter_md", "")
+    sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
+
+    # Reset cached files if content changed
+    if st.session_state.get("docx_sig") != sig:
+        st.session_state["docx_sig"] = sig
+        st.session_state["resume_docx"] = None
+        st.session_state["cover_docx"] = None
+
+    # Prepare files once if missing
+    if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
+        with st.spinner("Preparing downloads…"):
+            try:
+                for which in ("resume", "cover"):
+                    payload = {
+                        "tailored_resume_md": resume_md,
+                        "cover_letter_md": cover_md,
+                        "which": which,
+                    }
+                    rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+                    rr.raise_for_status()
+                    if which == "resume":
+                        st.session_state["resume_docx"] = rr.content
+                    else:
+                        st.session_state["cover_docx"] = rr.content
+            except Exception as e:
+                st.error(f"Export failed: {e}")
+
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Download résumé"):
-            try:
-                p = {
-                    "tailored_resume_md": tailored.get("tailored_resume_md", ""),
-                    "cover_letter_md": tailored.get("cover_letter_md", ""),
-                    "which": "resume",
-                }
-                rr = requests.post(f"{backend_url}/export", json=p, timeout=60)
-                rr.raise_for_status()
-                st.download_button(
-                    "Save résumé",
-                    data=rr.content,
-                    file_name="pathio_resume.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            except Exception as e:
-                st.error(f"Export failed: {e}")
+        st.download_button(
+            "Download résumé",
+            data=st.session_state.get("resume_docx") or b"",
+            file_name="pathio_resume.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            disabled=st.session_state.get("resume_docx") is None,
+            key="dl_resume",
+        )
     with col2:
-        if st.button("Download cover letter"):
-            try:
-                p = {
-                    "tailored_resume_md": tailored.get("tailored_resume_md", ""),
-                    "cover_letter_md": tailored.get("cover_letter_md", ""),
-                    "which": "cover",
-                }
-                rr = requests.post(f"{backend_url}/export", json=p, timeout=60)
-                rr.raise_for_status()
-                st.download_button(
-                    "Save cover letter",
-                    data=rr.content,
-                    file_name="pathio_cover_letter.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            except Exception as e:
-                st.error(f"Export failed: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.download_button(
+            "Download cover letter",
+            data=st.session_state.get("cover_docx") or b"",
+            file_name="pathio_cover_letter.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            disabled=st.session_state.get("cover_docx") is None,
+            key="dl_cover",
+        )
+
+    # --- What changed (optional separate box) ---
+    if changes_md:
+        st.markdown("<div class='section-title'>What changed</div>", unsafe_allow_html=True)
+        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
+        st.markdown(changes_md, unsafe_allow_html=False)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------- Insights ----------
 if insights:
@@ -324,121 +424,42 @@ if insights:
     except Exception:
         insights = {}
 
+    st.markdown("<div class='section-title'>Insights</div>", unsafe_allow_html=True)
+
     score = int((insights or {}).get("match_score") or 0)
     missing = list((insights or {}).get("missing_keywords") or [])
     flags = list((insights or {}).get("ats_flags") or [])
 
-    score_pct = max(0, min(score, 100))
-    score_width = f"{score_pct}%"
+    # Match score
+    st.write(f"**Match score:** {score}%")
+    st.progress(max(0, min(score, 100)) / 100.0)
 
+    # Missing keywords
     if missing:
-        missing_html = '<div class="pills">' + "".join(
-            f'<span class="pill warn">⚠️ {html.escape(str(kw))}</span>' for kw in missing
-        ) + "</div>"
+        st.warning("Missing keywords")
+        st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
     else:
-        missing_html = '<div class="caption">✅ No critical keywords missing</div>'
+        st.success("No critical keywords missing")
 
+    # ATS checks
     if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
-        flags_html = "<ul class='clean-list'>" + "".join(
-            f"<li>⚠️ {html.escape(str(f))}</li>" for f in flags
-        ) + "</ul>"
+        st.warning("ATS checks")
+        st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
     else:
-        flags_html = (
-            '<div class="caption">'
-            '✅ Your tailored résumé passed automated parsing checks (ATS) '
-            'and should upload cleanly to job portals.'
-            '</div>'
-        )
+        st.info("Passed automated parsing checks (ATS).")
 
-    insights_iframe_html = dedent(f"""
-    <style>
-      :root {{
-        --text:#333; --muted:#888; --border:#e6e6e6; --panel:#f7f7f7; --accent:#3366ff; --radius:12px;
-      }}
-      body {{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); }}
-      .insights-wrap {{ margin:8px 0 4px; display:grid; gap:12px; }}
-      @media (min-width:720px) {{
-        .insights-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }}
-      }}
-      .card {{ background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; }}
-      .card h4 {{ margin:0 0 8px; font-size:14px; color:var(--muted); font-weight:600; }}
-      .score-box {{ background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:14px; display:grid; gap:10px; }}
-      .score-top {{ display:flex; align-items:center; justify-content:space-between; }}
-      .score-label {{ color:var(--muted); font-size:13px; }}
-      .score-badge {{ font-weight:700; font-size:18px; padding:6px 10px; border-radius:999px; background:#f0f8ff; border:1px solid #d9e7ff; color:#1e3a8a; }}
-      .score-bar {{ height:8px; width:100%; background:#f2f2f2; border:1px solid var(--border); border-radius:999px; overflow:hidden; }}
-      .score-fill {{ height:100%; background: linear-gradient(90deg,#60a5fa,#22c55e); }}
-      .pills {{ display:flex; flex-wrap:wrap; gap:8px; }}
-      .pill {{ display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; border:1px solid var(--border); background:#fff; color:#333; }}
-      .pill.warn {{ background:#fff7ed; border-color:#fde68a; color:#92400e; }}
-      .clean-list {{ margin:0; padding-left:18px; }}
-      .clean-list li {{ margin:4px 0; }}
-      .caption {{ color:#777; font-size:12px; }}
-    </style>
-
-    <div class="insights-wrap">
-      <div class="score-box">
-        <div class="score-top">
-          <div class="score-label">Match score</div>
-          <div class="score-badge">{score_pct}%</div>
-        </div>
-        <div class="score-bar"><div class="score-fill" style="width:{score_width};"></div></div>
-      </div>
-
-      <div class="insights-grid">
-        <div class="card">
-          <h4>Missing keywords</h4>
-          {missing_html}
-        </div>
-        <div class="card">
-          <h4>ATS checks</h4>
-          {flags_html}
-        </div>
-      </div>
-    </div>
-    """).strip()
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### Insights")
-    st.components.v1.html(insights_iframe_html, height=480, scrolling=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ---------- Be a better candidate (ONLY if backend provides) ----------
+    # Be a better candidate (if provided)
     do_now = list((insights or {}).get("do_now") or [])
     do_long = list((insights or {}).get("do_long") or [])
-
     if do_now or do_long:
-        def link_for(item_text: str) -> str:
-            # Pass the exact action text as the prompt.
-            href = f"?view=chat&prompt={quote(item_text)}"
-            return f"<a class='chip' href='{href}' target='_blank' rel='noopener noreferrer'>Show me how</a>"
-
-        st.markdown('<div class="card be-better">', unsafe_allow_html=True)
-        st.markdown("#### Be a better candidate")
-        colA, colB = st.columns(2)
-
-        with colA:
-            if do_now:
-                st.markdown("**Do these now**")
-                for text in do_now:
-                    st.markdown(
-                        f"• {html.escape(str(text))} {link_for(str(text))}",
-                        unsafe_allow_html=True,
-                    )
-
-        with colB:
-            if do_long:
-                st.markdown("**Do these long term**")
-                for text in do_long:
-                    st.markdown(
-                        f"• {html.escape(str(text))} {link_for(str(text))}",
-                        unsafe_allow_html=True,
-                    )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ---------- Optional micro‑footer (uncomment to show) ----------
-# st.markdown(
-#     "<div style='text-align:center; color:#888; font-size:12px; margin-top:16px;'>"
-#     "No data is stored. Refresh clears your inputs."
-#     "</div>", unsafe_allow_html=True
-# )
+        st.markdown("<div class='section-title'>Be a better candidate</div>", unsafe_allow_html=True)
+        if do_now:
+            st.write("**Do these now**")
+            for text in do_now:
+                href = f"?view=chat&prompt={quote(str(text))}"
+                st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
+        if do_long:
+            st.write("**Do these long term**")
+            for text in do_long:
+                href = f"?view=chat&prompt={quote(str(text))}"
+                st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
