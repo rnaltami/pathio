@@ -75,6 +75,13 @@ def root():
 # -----------------------------
 # --- begin replacement /export handler in backend/app/main.py ---
 
+# -----------------------------
+# OVERRIDE /export with résumé-specific cleanup
+# - Summary moved to top as real heading
+# - one blank line after Summary
+# - "What changed" removed
+# - all markdown (** _ ` etc.) stripped from paragraphs
+# -----------------------------
 from fastapi import APIRouter
 from pydantic import BaseModel
 import re
@@ -101,42 +108,52 @@ def _strip_markdown_inline(s: str) -> str:
     return s
 
 def _remove_what_changed(md: str) -> str:
-    """Drop the '**What changed**' section and everything after it."""
-    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*$', md, re.MULTILINE)
+    """
+    Remove the 'What changed' section (any of '**What changed**' or '# What changed', case-insensitive)
+    and everything after it.
+    """
+    m = re.search(r'(?im)^\s*(?:\*\*\s*what\s+changed\s*\*\*|#{1,6}\s*what\s+changed)\b.*$', md, re.M)
     if not m:
         return md
     return md[:m.start()].rstrip()
 
 def _extract_summary(md: str) -> tuple[str | None, str]:
     """
-    Return (summary_block, rest_without_summary).
-    summary_block includes header and its following bullet block.
+    Return (summary_block_markdown, rest_without_summary).
+    Captures from the '**Summary**' (or '# Summary') header line through lines up to
+    (but not including) the next section header-like line:
+      - markdown heading:    # / ## / ### ...
+      - bold header line:    **Section**
+    Works whether the summary is bullets or a paragraph.
     """
     if not md:
         return None, md
     lines = md.splitlines()
+
+    # locate summary header (bold or markdown heading)
     start = None
     for i, line in enumerate(lines):
-        if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
+        if re.fullmatch(r'\s*(\*\*\s*summary\s*\*\*|#{1,6}\s*summary)\s*', line.strip(), flags=re.IGNORECASE):
             start = i
             break
     if start is None:
         return None, md
 
+    def is_header_like(s: str) -> bool:
+        s = s.strip()
+        if not s:
+            return False
+        if s.startswith("#"):
+            return True
+        if re.fullmatch(r"\*\*.+\*\*", s):   # bold-only header line
+            return True
+        return False
+
     end = start + 1
-    saw_bullet = False
     while end < len(lines):
-        s = lines[end].strip()
-        if s == "":
-            end += 1
-            continue
-        if s.startswith(("-", "•", "*")):
-            saw_bullet = True
-            end += 1
-            continue
-        if saw_bullet:
+        if is_header_like(lines[end]):
             break
-        break
+        end += 1
 
     summary_block = "\n".join(lines[start:end]).strip()
     rest = ("\n".join(lines[:start] + lines[end:])).strip()
@@ -154,35 +171,28 @@ def export_doc(req: ExportRequest):
             status_code=400,
         )
 
-    # For résumé exports, put Summary at top, strip **, add a blank line, and remove 'What changed'
+    # Résumé-specific layout: Summary (clean) at top, blank line, then body; drop What changed
     if req.which == "resume":
-        md_no_changed = _remove_what_changed(content)
-        summary_block, rest_block = _extract_summary(md_no_changed)
+        md = _remove_what_changed(content)
+        summary_block, body_without_summary = _extract_summary(md)
 
-        # Build a clean, export-friendly markdown:
-        # - Convert "**Summary**" header to "# Summary"
-        # - Keep the bullets under it
-        # - Add a blank line
-        # - Append the rest of the resume (without the original Summary or What changed)
         if summary_block:
-            # Remove the bold header line and keep only its body
+            # Drop the header line itself and keep bullets/paragraph that follow
             summary_lines = summary_block.splitlines()
-            # drop the first line (the **Summary** line)
             summary_body = "\n".join(summary_lines[1:]).strip()
-            clean_md = "# Summary\n"
+            # Build a clean markdown doc: H1 Summary + body (we'll strip inline md later)
+            clean_top = "# Summary\n"
             if summary_body:
-                clean_md += summary_body + "\n"
-            clean_md += "\n"  # blank line after summary
-            content = (clean_md + (rest_block or "")).strip()
+                clean_top += summary_body + "\n"
+            clean_top += "\n"  # blank line after summary
+            content = (clean_top + (body_without_summary or "")).strip()
         else:
-            # No explicit Summary; just use content without 'What changed'
-            content = md_no_changed
+            content = md  # No summary present; still without 'What changed'
 
-    # Try to generate DOCX; fallback to stripped plain text
+    # Try to build DOCX; fallback to stripped text
     try:
         from docx import Document  # python-docx
     except Exception:
-        # Fallback: plain text with markdown stripped (so ** are gone even in .txt)
         txt = "\n".join(_strip_markdown_inline(line) for line in content.splitlines())
         return Response(
             content=txt.encode("utf-8"),
@@ -190,14 +200,13 @@ def export_doc(req: ExportRequest):
             headers={"Content-Disposition": 'attachment; filename="export.txt"'},
         )
 
-    # Build the DOCX
     doc = Document()
     bullet_pattern = re.compile(r"^\s*[-*•]\s+(.*)$")
 
     for raw in content.splitlines():
         line = raw.rstrip("\n")
 
-        # headings
+        # Headings
         if line.startswith("# "):
             doc.add_heading(_strip_markdown_inline(line[2:].strip()), level=1)
             continue
@@ -208,12 +217,12 @@ def export_doc(req: ExportRequest):
             doc.add_heading(_strip_markdown_inline(line[4:].strip()), level=3)
             continue
 
-        # horizontal rules / separators
+        # Horizontal rules / separators
         if re.fullmatch(r"\s*-{3,}\s*", line):
             doc.add_paragraph("")
             continue
 
-        # bullets
+        # Bullets
         m = bullet_pattern.match(line)
         if m:
             text = _strip_markdown_inline(m.group(1).strip())
@@ -223,12 +232,12 @@ def export_doc(req: ExportRequest):
                 doc.add_paragraph("• " + text)
             continue
 
-        # blank line
+        # Blank line
         if not line.strip():
             doc.add_paragraph("")
             continue
 
-        # normal paragraph
+        # Normal paragraph
         doc.add_paragraph(_strip_markdown_inline(line))
 
     import io
@@ -241,8 +250,5 @@ def export_doc(req: ExportRequest):
         headers={"Content-Disposition": 'attachment; filename="pathio_export.docx"'},
     )
 
-# Mount (or keep mounted) after defining
+# Mount last so it overrides any earlier /export
 app.include_router(export_router)
-
-# --- end replacement /export handler ---
-
