@@ -249,14 +249,14 @@ job_text = st.text_area(
 )
 
 # HIDE the explore-jobs link per request (kept only as a comment for future)
-/*
+
 st.markdown(
     "<div style='text-align:right; font-size:13px; margin-top:-8px;'>"
     "<a href='?view=future' style='text-decoration:none;'>explore jobs →</a>"
     "</div>",
     unsafe_allow_html=True,
 )
-*/
+
 
 resume_text = st.text_area(
     "Résumé input",
