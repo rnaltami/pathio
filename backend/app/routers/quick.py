@@ -581,40 +581,6 @@ def quick_tailor(req: QuickTailorRequest):
         },
     }
 
-@router.post("/export")
-def export_doc(req: ExportRequest):
-    content = req.tailored_resume_md if req.which == "resume" else req.cover_letter_md
-    if not content:
-        raise HTTPException(status_code=400, detail="No content to export.")
-
-    try:
-        from docx import Document  # python-docx
-    except Exception:
-        return Response(
-            content=content.encode("utf-8"),
-            media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": 'attachment; filename="export.txt"'},
-        )
-
-    doc = Document()
-    for line in content.splitlines():
-        s = line.strip("\n")
-        if s.startswith("# "):
-            doc.add_heading(s[2:].strip(), level=1)
-        elif s.startswith("## "):
-            doc.add_heading(s[3:].strip(), level=2)
-        else:
-            doc.add_paragraph(s)
-
-    import io
-    bio = io.BytesIO()
-    doc.save(bio)
-    bio.seek(0)
-    return Response(
-        content=bio.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": 'attachment; filename="pathio_export.docx"'},
-    )
 
 @router.post("/coach")
 def coach(req: ChatRequest):
