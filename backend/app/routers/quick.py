@@ -288,29 +288,6 @@ def llm_actions(resume_text: str, job_text: str, missing_skills: List[str]) -> T
     do_now = [str(x) for x in (data.get("do_now") or [])]
     do_long = [str(x) for x in (data.get("do_long") or [])]
 
-def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
-    """
-    Heuristic upskilling suggestions when the LLM is unavailable.
-    Uses up to 3 'missing' keywords if present; otherwise generic ops terms.
-    """
-    # keep only short, readable hints
-    kws = [m.strip() for m in (missing or []) if isinstance(m, str) and 2 < len(m.strip()) < 28][:3]
-    if not kws:
-        kws = ["scheduling", "coordination", "reporting"]
-
-    do_now = [
-        f"Draft a one-page alignment sheet: map current bullets to job needs ({', '.join(kws)}). (time: ~1–2 hours)",
-        f"Create a sample artifact that mirrors the role (checklist/run-book) emphasizing {kws[0]}. (time: ~3–4 hours)",
-        "Compile an impact sheet from past projects (before/after, volume, quality, timing). (time: ~2–3 hours)",
-    ]
-
-    do_long = [
-        f"Turn the sample artifact into a portfolio piece with a README and reflection. (time: ~1–2 weeks)",
-        "Contribute a small improvement to a workflow/template you use; document and share. (time: ~1–2 weeks)",
-    ]
-    return do_now, do_long
-
-
     def clean(items: List[str], is_now: bool) -> List[str]:
         out: List[str] = []
         for s in items:
@@ -338,29 +315,6 @@ def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
         return out[:3]
 
     return clean(do_now, True), clean(do_long, False)
-
-# ---------- NEW: Heuristic fallback for actions ----------
-def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
-    """
-    Heuristic actions when the LLM path is unavailable or returns nothing.
-    Keeps items honest (no new tools) and artifact-oriented.
-    """
-    focus = [m for m in (missing or []) if isinstance(m, str) and len(m) > 2][:3]
-    if not focus:
-        focus = ["the role’s core outputs"]
-
-    do_now = [
-        "Create a one-page alignment summary mapping your bullets to the job responsibilities; add links to past work. (time: ~1–2 hours)",
-        f"Draft a sample work artifact that matches {focus[0]} (process doc / outline / checklist) using tools already on your resume. (time: ~3–4 hours)",
-        "Compile a simple impact sheet from past projects (before/after, volume, quality, timing). (time: ~2–3 hours)",
-    ][:3]
-
-    do_long = [
-        "Extend the sample artifact into a portfolio piece with a README and reflection on tradeoffs. (time: ~1–2 weeks)",
-        "Contribute a small improvement to a template/workflow you already use; document the change. (time: ~1–2 weeks)",
-    ][:2]
-
-    return do_now, do_long
 
 # =========================
 # Sanitizer to prevent over-embellishment
@@ -540,43 +494,23 @@ def _ensure_summary_and_changes(tailored_md: str, resume_text: str) -> str:
         text = text.rstrip() + changes
 
     return text
-# ---------- LLM live-call debug ----------
-@router.get("/debug/llm")
-def debug_llm():
-    info = {
-        "has_key": bool(OPENAI_API_KEY),
-        "client_exists": _client is not None,
-        "using_new_sdk": _new_api,
-        "model": OPENAI_MODEL,
-    }
-    if not _client or not OPENAI_API_KEY:
-        info["ok"] = False
-        info["error"] = "No client or key"
-        return info
-    try:
-        if _new_api:
-            resp = _client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[{"role": "user", "content": "ping"}],
-                temperature=0,
-                max_tokens=5,
-            )
-            sample = (resp.choices[0].message.content or "")[:40]
-        else:
-            resp = _client.ChatCompletion.create(
-                model=OPENAI_MODEL,
-                messages=[{"role": "user", "content": "ping"}],
-                temperature=0,
-                max_tokens=5,
-            )
-            sample = (resp.choices[0].message["content"] or "")[:40]
-        info["ok"] = True
-        info["sample"] = sample
-        return info
-    except Exception as e:
-        info["ok"] = False
-        info["error"] = str(e)
-        return info
+
+# ---------- Heuristic fallback for actions ----------
+def build_actions_fallback(missing: List[str]) -> Tuple[List[str], List[str]]:
+    # keep it generic and truthful to avoid invention
+    safe_missing = [m for m in (missing or []) if isinstance(m, str)]
+    focus = ", ".join(safe_missing[:3]) if safe_missing else "the role’s core tasks"
+
+    do_now = [
+        f"Create a one-page alignment summary mapping your bullets to {focus}. (time: ~1–2 hours)",
+        "Draft a sample work artifact (process doc / outline / checklist) using tools already on your résumé. (time: ~3–4 hours)",
+        "Compile a simple impact sheet from past projects (before/after, volume, quality, timing). (time: ~2–3 hours)",
+    ]
+    do_long = [
+        "Turn the sample artifact into a portfolio piece with a README and notes on trade-offs. (time: ~1–2 weeks)",
+        "Improve a workflow/template you already use and document the change. (time: ~1–2 weeks)",
+    ]
+    return do_now[:3], do_long[:2]
 
 # =========================
 # Routes
@@ -613,10 +547,26 @@ def quick_tailor(req: QuickTailorRequest):
         cover_md = heuristic_cover(resume_text, job_text)
     cover_md = sanitize_tailored(cover_md, resume_text)
 
-    # Actions: prefer LLM; fallback to heuristic
-    do_now, do_long = llm_actions(resume_text, job_text, missing or [])
-    if not do_now or not do_long:
+    # Actions: prefer LLM; fallback to heuristic (ROBUST UNPACK)
+    do_now: Optional[List[str]] = None
+    do_long: Optional[List[str]] = None
+    try:
+        actions_result = llm_actions(resume_text, job_text, missing or [])
+    except Exception:
+        actions_result = None
+
+    if (
+        not actions_result
+        or not isinstance(actions_result, tuple)
+        or len(actions_result) != 2
+        or actions_result[0] is None
+        or actions_result[1] is None
+    ):
         do_now, do_long = build_actions_fallback(missing or [])
+    else:
+        do_now, do_long = actions_result
+        if not do_now or not do_long:
+            do_now, do_long = build_actions_fallback(missing or [])
 
     return {
         "tailored_resume_md": tailored_md,
@@ -626,8 +576,8 @@ def quick_tailor(req: QuickTailorRequest):
             "match_score": score,
             "missing_keywords": missing or [],
             "ats_flags": flags,
-            "do_now": do_now,
-            "do_long": do_long,
+            "do_now": do_now or [],
+            "do_long": do_long or [],
         },
     }
 
@@ -678,12 +628,3 @@ def coach(req: ChatRequest):
     chat = [{"role":"system","content":system}] + msgs
     raw = _chat(chat, max_tokens=700, temperature=0.2) or ""
     return {"reply": raw.strip() or "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"}
-
-@router.get("/debug/llm")
-def debug_llm():
-    return {
-        "has_key": bool(OPENAI_API_KEY),
-        "client_exists": _client is not None,
-        "using_new_sdk": _new_api,
-        "model": OPENAI_MODEL,
-    }
