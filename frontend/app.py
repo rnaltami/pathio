@@ -1,4 +1,4 @@
-# app.py (Streamlit defaults — no custom CSS/HTML)
+# app.py
 import os
 import json
 import html
@@ -27,10 +27,32 @@ qp = st.query_params
 # ----- Chat helper view (?view=chat&prompt=...) -----
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-    title = f"How-to: {seed}" if seed else "How-to Guide"
-    st.set_page_config(page_title=title, page_icon="pathio-logo.png", layout="centered")
+    # smaller, tasteful window title; we’ll render our own heading below
+    st.set_page_config(page_title=("How-to" if not seed else f"How-to: {seed}"), page_icon="pathio-logo.png", layout="centered")
 
-    st.title(title)
+    # Page-local style to keep chat heading modest
+    st.markdown(
+        """
+        <style>
+          .chat-title {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            margin: 4px 0 2px 0 !important;
+            letter-spacing: 0.2px;
+          }
+          .chat-subtle {
+            font-size: 13px !important;
+            opacity: 0.75;
+            margin-bottom: 6px !important;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    title = f"How-to: {seed}" if seed else "How-to Guide"
+    st.markdown(f"<div class='chat-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='chat-subtle'>Practical, step-by-step instructions.</div>", unsafe_allow_html=True)
     st.divider()
 
     st.session_state.setdefault("chat_messages", [])
@@ -97,10 +119,11 @@ if qp.get("view") == "chat":
     st.stop()
 
 # ----- Future jobs placeholder (?view=future) -----
+# HIDDEN per request — leave the route intact but never reachable via UI
 if qp.get("view") == "future":
     st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
     st.title("Explore future jobs")
-    st.info("This page is coming soon. (You landed here via the link under the job box.)")
+    st.info("This page is coming soon. (You landed here via a direct URL.)")
     st.stop()
 
 # =====================================================
@@ -111,41 +134,43 @@ st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="cen
 # ---------- Header ----------
 st.markdown(
     """
-    <div style="text-align:center; margin-bottom:1.5rem;">
-        <div style="font-size:42px; font-weight:700; margin-bottom:4px;">
-            :PATHIO
+    <div style="text-align:center; margin-bottom:1.25rem;">
+        <div style="font-size:28px; font-weight:800; letter-spacing:0.3px; margin-bottom:2px;">
+            PATHIO
         </div>
-        <p class="tagline">
-            Tailor your résumé for the job.
+        <p class="tagline" style="margin:0.2rem 0 0 0;">
+            Tailor your résumé and cover letter — and get immediate, practical steps to become a stronger candidate.
         </p>
+        <div class="launching" style="margin-top:6px; font-size:12px; opacity:0.75;">
+            Launching soon
+        </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Global Styles ----------
+# ---------- Global Styles (uniform “card” style + typographic tune-up) ----------
 st.markdown(
     """
     <style>
-      /* ========= Typographic scale ========= */
-      /* Big: logo handled inline (42px) */
-      /* Medium: tagline, buttons, section titles */
+      :root {
+        --radius: 14px;
+      }
+
+      /* ========= Typography ========= */
       .tagline,
       .stButton button,
       .section-title {
         font-size:16px !important;
-        font-weight:600 !important;  /* titles a touch bolder */
+        font-weight:600 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
           Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
       }
 
-      /* Small: user-entered text & captions */
       textarea, .stTextInput input {
         font-size:13px !important;
         font-weight:400 !important;
       }
-
-      /* Placeholder text = medium */
       textarea::placeholder,
       .stTextInput input::placeholder {
         font-size:16px !important;
@@ -153,49 +178,51 @@ st.markdown(
         opacity:0.75;
       }
 
-      /* Captions = even smaller */
       .stCaption, footer, .stMarkdown small {
         font-size:12px !important;
         opacity:0.8;
       }
 
-      /* ========= Result boxes ========= */
-      .result-box {
-        padding:12px 14px;
-        border-radius:10px;
+      /* ========= Card pattern ========= */
+      .card {
+        padding:16px 18px;
+        border-radius:var(--radius);
         border:1px solid rgba(0,0,0,0.08);
-        margin:8px 0 18px 0;
+        margin:10px 0 18px 0;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.03);
       }
+      .card + .card { margin-top:18px; }
+
+      .card-head {
+        font-size:14px !important;
+        font-weight:700 !important;
+        margin:-4px -6px 10px -6px;
+        padding:6px 8px;
+        border-radius:10px;
+        display:inline-block;
+        letter-spacing:0.2px;
+      }
+
       @media (prefers-color-scheme: light) {
-        .result-box { background:#f7f9ff; } /* light indigo tint */
+        .card { background:#ffffff; }
+        .card-head { background:#EEF2FF; color:#1e2a78; } /* indigo tint */
       }
       @media (prefers-color-scheme: dark) {
-        .result-box { background:#111827; border-color:rgba(255,255,255,0.08); }
+        .card { background:#0f172a; border-color:rgba(255,255,255,0.08); }
+        .card-head { background:#111827; color:#c7d2fe; }
       }
 
-      /* Make everything INSIDE the result box small & tight */
-      .result-box * {
-        font-size:13px !important;
-        line-height:1.5 !important;
-        margin-top:0.25rem;
-        margin-bottom:0.25rem;
-      }
-      .result-box h1, .result-box h2, .result-box h3,
-      .result-box h4, .result-box h5, .result-box h6 {
-        font-size:13.5px !important;
-        font-weight:600 !important;
-        margin-top:0.35rem !important;
-        margin-bottom:0.35rem !important;
-      }
-
-      /* Section titles (use instead of st.subheader for medium size) */
-      .section-title { margin:14px 0 6px 0; }
-
-      /* Normalize global markdown heading sizes (outside boxes) */
+      /* Normalize global markdown heading sizes (outside cards) */
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         font-size:16px !important;
         font-weight:600 !important;
         margin:12px 0 6px 0 !important;
+      }
+
+      /* Buttons */
+      .stButton button {
+        padding:0.55rem 0.9rem;
+        border-radius:12px;
       }
     </style>
     """,
@@ -220,12 +247,16 @@ job_text = st.text_area(
     placeholder="Paste job listing.",
     label_visibility="collapsed",
 )
+
+# HIDE the explore-jobs link per request (kept only as a comment for future)
+/*
 st.markdown(
     "<div style='text-align:right; font-size:13px; margin-top:-8px;'>"
     "<a href='?view=future' style='text-decoration:none;'>explore jobs →</a>"
     "</div>",
     unsafe_allow_html=True,
 )
+*/
 
 resume_text = st.text_area(
     "Résumé input",
@@ -270,7 +301,7 @@ if st.button("Update résumé + create cover letter", key="cta"):
 if not st.session_state.get("tailored"):
     st.caption("＋ insights and clear steps to improve your match for the role.")
 
-# ---------- Helper: split out "What changed" ----------
+# ---------- Helpers ----------
 def split_what_changed(md: str):
     """
     Split the tailored resume Markdown into (main_md, changes_md).
@@ -278,14 +309,13 @@ def split_what_changed(md: str):
     """
     if not md:
         return "", None
-    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
+    m = re.search(r'(?im)^\\s*\\*\\*what changed\\*\\*\\s*', md)
     if not m:
         return md, None
     main_md = md[:m.start()].rstrip()
     changes_md = md[m.start():].lstrip()  # keep the **What changed** header
     return main_md, changes_md
 
-# ---------- Helper: split out "**Summary**" to its own card ----------
 def split_summary(md: str):
     """
     Find a '**Summary**' header and return (summary_md, rest_md).
@@ -296,15 +326,13 @@ def split_summary(md: str):
         return None, md
     lines = md.splitlines()
     start = None
-    # locate the line that is exactly '**Summary**' (case-insensitive)
     for i, line in enumerate(lines):
-        if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
+        if re.match(r'^\\s*\\*\\*summary\\*\\*\\s*$', line.strip(), re.IGNORECASE):
             start = i
             break
     if start is None:
         return None, md
 
-    # collect the bullet block after the header
     end = start + 1
     saw_bullet = False
     while end < len(lines):
@@ -320,11 +348,11 @@ def split_summary(md: str):
             break
         break
 
-    summary_md = "\n".join(lines[start:end]).strip()
+    summary_md = "\\n".join(lines[start:end]).strip()
     if summary_md.lower().strip() == "**summary**":
         return None, md
 
-    rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
+    rest_md = ("\\n".join(lines[:start] + lines[end:])).strip()
     return summary_md, rest_md
 
 # ---------- Output ----------
@@ -337,84 +365,87 @@ if tailored:
     main_md, changes_md = split_what_changed(resume_md_full)
     summary_md, body_md = split_summary(main_md)
 
-    # Summary card (if present)
-    if summary_md:
-        st.markdown("<div class='section-title'>Summary</div>", unsafe_allow_html=True)
-        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
-        st.markdown(summary_md, unsafe_allow_html=False)
+    # Summary + Résumé card
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("<span class='card-head'>Résumé Preview</span>", unsafe_allow_html=True)
+        if summary_md:
+            st.markdown("**Summary**", unsafe_allow_html=False)
+            st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
+            st.markdown("---")
+        st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Résumé preview (without the Summary block)
-    st.markdown("<div class='section-title'>Tailored résumé (preview)</div>", unsafe_allow_html=True)
-    st.markdown("<div class='result-box'>", unsafe_allow_html=True)
-    st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Cover letter card
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("<span class='card-head'>Cover Letter Preview</span>", unsafe_allow_html=True)
+        st.markdown(tailored.get("cover_letter_md", ""), unsafe_allow_html=False)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- Cover letter ---
-    st.markdown("<div class='section-title'>Cover letter (preview)</div>", unsafe_allow_html=True)
-    st.markdown("<div class='result-box'>", unsafe_allow_html=True)
-    st.markdown(tailored.get("cover_letter_md", ""), unsafe_allow_html=False)
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Downloads card
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("<span class='card-head'>Downloads (.docx)</span>", unsafe_allow_html=True)
 
-    # --- Downloads (one-click) ---
-    st.markdown("<div class='section-title'>Downloads (.docx)</div>", unsafe_allow_html=True)
+        # Use FULL resume for download (includes "What changed"). Change to `body_md` to exclude.
+        resume_md = resume_md_full
+        cover_md  = tailored.get("cover_letter_md", "")
+        sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
 
-    # Use FULL resume for download (includes "What changed"). Change to `body_md` to exclude.
-    resume_md = resume_md_full
-    cover_md  = tailored.get("cover_letter_md", "")
-    sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
+        # Reset cached files if content changed
+        if st.session_state.get("docx_sig") != sig:
+            st.session_state["docx_sig"] = sig
+            st.session_state["resume_docx"] = None
+            st.session_state["cover_docx"] = None
 
-    # Reset cached files if content changed
-    if st.session_state.get("docx_sig") != sig:
-        st.session_state["docx_sig"] = sig
-        st.session_state["resume_docx"] = None
-        st.session_state["cover_docx"] = None
+        # Prepare files once if missing
+        if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
+            with st.spinner("Preparing downloads…"):
+                try:
+                    for which in ("resume", "cover"):
+                        payload = {
+                            "tailored_resume_md": resume_md,
+                            "cover_letter_md": cover_md,
+                            "which": which,
+                        }
+                        rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+                        rr.raise_for_status()
+                        if which == "resume":
+                            st.session_state["resume_docx"] = rr.content
+                        else:
+                            st.session_state["cover_docx"] = rr.content
+                except Exception as e:
+                    st.error(f"Export failed: {e}")
 
-    # Prepare files once if missing
-    if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
-        with st.spinner("Preparing downloads…"):
-            try:
-                for which in ("resume", "cover"):
-                    payload = {
-                        "tailored_resume_md": resume_md,
-                        "cover_letter_md": cover_md,
-                        "which": which,
-                    }
-                    rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
-                    rr.raise_for_status()
-                    if which == "resume":
-                        st.session_state["resume_docx"] = rr.content
-                    else:
-                        st.session_state["cover_docx"] = rr.content
-            except Exception as e:
-                st.error(f"Export failed: {e}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "Download résumé",
+                data=st.session_state.get("resume_docx") or b"",
+                file_name="pathio_resume.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                disabled=st.session_state.get("resume_docx") is None,
+                key="dl_resume",
+            )
+        with col2:
+            st.download_button(
+                "Download cover letter",
+                data=st.session_state.get("cover_docx") or b"",
+                file_name="pathio_cover_letter.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                disabled=st.session_state.get("cover_docx") is None,
+                key="dl_cover",
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            "Download résumé",
-            data=st.session_state.get("resume_docx") or b"",
-            file_name="pathio_resume.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            disabled=st.session_state.get("resume_docx") is None,
-            key="dl_resume",
-        )
-    with col2:
-        st.download_button(
-            "Download cover letter",
-            data=st.session_state.get("cover_docx") or b"",
-            file_name="pathio_cover_letter.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            disabled=st.session_state.get("cover_docx") is None,
-            key="dl_cover",
-        )
-
-    # --- What changed (optional separate box) ---
+    # What changed card (optional)
     if changes_md:
-        st.markdown("<div class='section-title'>What changed</div>", unsafe_allow_html=True)
-        st.markdown("<div class='result-box'>", unsafe_allow_html=True)
-        st.markdown(changes_md, unsafe_allow_html=False)
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container():
+            st.markdown("<div class='card'>", unsafe_allow_html=True)
+            st.markdown("<span class='card-head'>What changed</span>", unsafe_allow_html=True)
+            st.markdown(changes_md, unsafe_allow_html=False)
+            st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------- Insights ----------
 if insights:
@@ -424,42 +455,45 @@ if insights:
     except Exception:
         insights = {}
 
-    st.markdown("<div class='section-title'>Insights</div>", unsafe_allow_html=True)
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("<span class='card-head'>Insights</span>", unsafe_allow_html=True)
 
-    score = int((insights or {}).get("match_score") or 0)
-    missing = list((insights or {}).get("missing_keywords") or [])
-    flags = list((insights or {}).get("ats_flags") or [])
+        score = int((insights or {}).get("match_score") or 0)
+        missing = list((insights or {}).get("missing_keywords") or [])
+        flags = list((insights or {}).get("ats_flags") or [])
 
-    # Match score
-    st.write(f"**Match score:** {score}%")
-    st.progress(max(0, min(score, 100)) / 100.0)
+        # Match score
+        st.write(f"**Match score:** {score}%")
+        st.progress(max(0, min(score, 100)) / 100.0)
 
-    # Missing keywords
-    if missing:
-        st.warning("Missing keywords")
-        st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
-    else:
-        st.success("No critical keywords missing")
+        # Missing keywords
+        if missing:
+            st.warning("Missing keywords")
+            st.write("- " + "\\n- ".join(html.escape(str(kw)) for kw in missing))
+        else:
+            st.success("No critical keywords missing")
 
-    # ATS checks
-    if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
-        st.warning("ATS checks")
-        st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
-    else:
-        st.info("Passed automated parsing checks (ATS).")
+        # ATS checks
+        if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
+            st.warning("ATS checks")
+            st.write("- " + "\\n- ".join(html.escape(str(f)) for f in flags))
+        else:
+            st.info("Passed automated parsing checks (ATS).")
 
-    # Be a better candidate (if provided)
-    do_now = list((insights or {}).get("do_now") or [])
-    do_long = list((insights or {}).get("do_long") or [])
-    if do_now or do_long:
-        st.markdown("<div class='section-title'>Be a better candidate</div>", unsafe_allow_html=True)
-        if do_now:
-            st.write("**Do these now**")
-            for text in do_now:
-                href = f"?view=chat&prompt={quote(str(text))}"
-                st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
-        if do_long:
-            st.write("**Do these long term**")
-            for text in do_long:
-                href = f"?view=chat&prompt={quote(str(text))}"
-                st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
+        # Be a better candidate (if provided)
+        do_now = list((insights or {}).get("do_now") or [])
+        do_long = list((insights or {}).get("do_long") or [])
+        if do_now or do_long:
+            st.markdown("**Be a better candidate**")
+            if do_now:
+                st.write("**Do these now**")
+                for text in do_now:
+                    href = f"?view=chat&prompt={quote(str(text))}"
+                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
+            if do_long:
+                st.write("**Do these long term**")
+                for text in do_long:
+                    href = f"?view=chat&prompt={quote(str(text))}"
+                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})", unsafe_allow_html=False)
+        st.markdown("</div>", unsafe_allow_html=True)
