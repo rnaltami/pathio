@@ -1,4 +1,4 @@
-# app.py — Tabs layout + polished copy
+# app.py — Tabs layout + separate "Be a better candidate" tab
 import os
 import json
 import html
@@ -292,6 +292,7 @@ if tailored:
     if changes_md:
         tab_labels.append("What changed")
     tab_labels.append("Insights")
+    tab_labels.append("Be a better candidate")  # NEW dedicated tab
     tabs = st.tabs(tab_labels)
 
     # --- Résumé tab ---
@@ -359,15 +360,15 @@ if tailored:
             )
 
     # --- What changed tab (only if present) ---
-    idx = 3
+    next_idx = 3
     if changes_md:
-        with tabs[idx]:
+        with tabs[next_idx]:
             st.subheader("What changed")
             st.markdown(changes_md, unsafe_allow_html=False)
-        idx += 1
+        next_idx += 1
 
     # --- Insights tab ---
-    with tabs[idx]:
+    with tabs[next_idx]:
         try:
             if isinstance(insights, str):
                 insights = json.loads(insights)
@@ -377,8 +378,6 @@ if tailored:
         score = int((insights or {}).get("match_score") or 0)
         missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
-        do_now = list((insights or {}).get("do_now") or [])
-        do_long = list((insights or {}).get("do_long") or [])
 
         st.subheader("Match")
         st.write(f"**Match score:** {score}%")
@@ -396,8 +395,21 @@ if tailored:
         else:
             st.info("Passed automated parsing checks (ATS).")
 
-        if do_now or do_long:
-            st.subheader("Be a better candidate")
+    # --- Be a better candidate tab (NEW) ---
+    with tabs[next_idx + 1]:
+        try:
+            if isinstance(insights, str):
+                insights = json.loads(insights)
+        except Exception:
+            insights = {}
+
+        do_now = list((insights or {}).get("do_now") or [])
+        do_long = list((insights or {}).get("do_long") or [])
+
+        st.subheader("Be a better candidate")
+        if not (do_now or do_long):
+            st.info("No action suggestions available yet.")
+        else:
             if do_now:
                 st.write("**Do these now**")
                 for text in do_now:
