@@ -1,4 +1,4 @@
-# app.py — pill tabs, no update banner, no inner tab headings, copy tweaks
+# app.py — pill tabs, strict 503 handling, fixed Downloads indentation
 import os
 import json
 import html
@@ -22,8 +22,11 @@ qp = st.query_params
 # ----- Chat helper view (?view=chat&prompt=...) -----
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-    st.set_page_config(page_title=("How-to" if not seed else f"How-to: {seed}"),
-                       page_icon="pathio-logo.png", layout="centered")
+    st.set_page_config(
+        page_title=("How-to" if not seed else f"How-to: {seed}"),
+        page_icon="pathio-logo.png",
+        layout="centered"
+    )
 
     st.markdown(
         """
@@ -177,8 +180,8 @@ st.markdown(
         padding: 6px 10px !important;
         box-shadow: none !important; border: 0 !important; outline: none !important;
       }
-       button[role="tab"]::after { display:none !important; }
-    
+      button[role="tab"]::after { display:none !important; }
+
       button[role="tab"][aria-selected="true"]{
         background: var(--white) !important;
         color: var(--blue-700) !important;
@@ -198,7 +201,6 @@ st.markdown(
         background: var(--blue-600) !important; color: #fff !important; border: 1px solid var(--blue-600) !important;
       }
       .stButton button:hover{ filter: brightness(0.97); }
-
 
       /* Step badges */
       .step-row { display:flex; align-items:center; gap:.5rem; margin: 8px 2px 8px 2px; }
@@ -278,15 +280,21 @@ if st.button("Go", key="cta"):
             with st.spinner("Updating…"):
                 payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
                 r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-                r.raise_for_status()
-                data = r.json()
-                st.session_state["tailored"] = {
-                    "tailored_resume_md": data.get("tailored_resume_md", ""),
-                    "cover_letter_md": data.get("cover_letter_md", ""),
-                }
-                st.session_state["insights"] = data.get("insights", {})
+                # Graceful strict-mode handling
+                if r.status_code == 503:
+                    st.error("Couldn’t update right now — please try again in a moment.")
+                else:
+                    r.raise_for_status()
+                    data = r.json()
+                    st.session_state["tailored"] = {
+                        "tailored_resume_md": data.get("tailored_resume_md", ""),
+                        "cover_letter_md": data.get("cover_letter_md", ""),
+                    }
+                    st.session_state["insights"] = data.get("insights", {})
+        except requests.exceptions.HTTPError as http_err:
+            st.error(f"Update failed ({getattr(http_err.response, 'status_code', 'HTTP error')}). Please try again.")
         except Exception as e:
-            st.exception(e)
+            st.error("Something went wrong while updating. Please try again.")
 
 # ---------- Helpers ----------
 def split_what_changed(md: str):
@@ -346,7 +354,6 @@ if tailored:
     # Updated résumé
     with tabs[0]:
         if summary_md:
-            # no "Summary" header; just content
             st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
             st.divider()
         st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
@@ -355,30 +362,46 @@ if tailored:
     with tabs[1]:
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads
+    # Downloads (FIXED INDENTATION)
     with tabs[2]:
-        resume_md = resume_md_full
+        resume_md = resume_md_full  # backend export will remove Summary / What changed
+
         sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
         if st.session_state.get("docx_sig") != sig:
             st.session_state["docx_sig"] = sig
             st.session_state["resume_docx"] = None
             st.session_state["cover_docx"] = None
 
+        def _fetch_doc(which: str, resume_md: str, cover_md: str):
+            payload = {
+                "tailored_resume_md": resume_md,
+                "cover_letter_md": cover_md,
+                "which": which,
+            }
+            rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+            ctype = (rr.headers.get("Content-Type") or rr.headers.get("content-type") or "").lower()
+            x_err = rr.headers.get("X-Exporter-Error")
+            if "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in ctype and not x_err:
+                return rr.content, None
+            try:
+                msg = rr.text
+            except Exception:
+                msg = f"Export failed with status {rr.status_code}."
+            return None, msg
+
         if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
             with st.spinner("Preparing downloads…"):
                 try:
-                    for which in ("resume", "cover"):
-                        payload = {
-                            "tailored_resume_md": resume_md,
-                            "cover_letter_md": cover_md,
-                            "which": which,
-                        }
-                        rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
-                        rr.raise_for_status()
-                        if which == "resume":
-                            st.session_state["resume_docx"] = rr.content
-                        else:
-                            st.session_state["cover_docx"] = rr.content
+                    res_bytes, res_err = _fetch_doc("resume", resume_md, cover_md)
+                    cov_bytes, cov_err = _fetch_doc("cover", resume_md, cover_md)
+                    if res_err:
+                        st.error(f"Resume export error:\n\n{res_err}")
+                    else:
+                        st.session_state["resume_docx"] = res_bytes
+                    if cov_err:
+                        st.error(f"Cover letter export error:\n\n{cov_err}")
+                    else:
+                        st.session_state["cover_docx"] = cov_bytes
                 except Exception as e:
                     st.error(f"Export failed: {e}")
 
