@@ -1,4 +1,4 @@
-# app.py — Tabs layout + separate "Be a better candidate" tab
+# app.py — Tabs layout + refreshed copy + contained working area (light borders)
 import os
 import json
 import html
@@ -31,26 +31,16 @@ if qp.get("view") == "chat":
         layout="centered",
     )
 
-    # Keep the chat heading modest
+    # modest chat heading
     st.markdown(
         """
         <style>
-          .chat-title {
-            font-size: 20px !important;
-            font-weight: 700 !important;
-            margin: 4px 0 2px 0 !important;
-            letter-spacing: 0.2px;
-          }
-          .chat-subtle {
-            font-size: 13px !important;
-            opacity: 0.75;
-            margin-bottom: 6px !important;
-          }
+          .chat-title { font-size:20px; font-weight:700; margin:4px 0 2px 0; letter-spacing:.2px; }
+          .chat-subtle { font-size:13px; opacity:.75; margin-bottom:6px; }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
     title = f"How-to: {seed}" if seed else "How-to Guide"
     st.markdown(f"<div class='chat-title'>{title}</div>", unsafe_allow_html=True)
     st.markdown("<div class='chat-subtle'>Practical, step-by-step instructions.</div>", unsafe_allow_html=True)
@@ -120,7 +110,6 @@ if qp.get("view") == "chat":
     st.stop()
 
 # ----- Future jobs placeholder (?view=future) -----
-# Hidden (route exists if someone hits it directly)
 if qp.get("view") == "future":
     st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
     st.title("Explore future jobs")
@@ -132,40 +121,95 @@ if qp.get("view") == "future":
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# ---------- Minimal global style: typography only ----------
+# ---------- Global style (contained working area, typographic cleanup) ----------
 st.markdown(
     """
     <style>
-      .tagline,
-      .stButton button {
-        font-size:16px !important;
-        font-weight:600 !important;
+      :root {
+        --card-bg-light: #ffffff;
+        --card-bg-dark: #0b0f19;
+        --card-border-light: rgba(0,0,0,.08);
+        --card-border-dark: rgba(255,255,255,.10);
+      }
+      /* Base typography */
+      .app-shell, .app-shell * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
           Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
       }
+      .app-title { font-size:28px; font-weight:800; letter-spacing:.3px; margin:0; }
+      .tagline-hero { font-size:20px; font-weight:700; margin:.35rem 0 .1rem 0; }
+      .value-line { font-size:14px; font-weight:500; opacity:.95; margin:.35rem 0 .6rem 0; }
+      .instruction { font-size:13px; opacity:.85; margin:0; }
+
       textarea, .stTextInput input { font-size:13px !important; }
-      textarea::placeholder, .stTextInput input::placeholder { font-size:16px !important; opacity:0.75; }
+      textarea::placeholder, .stTextInput input::placeholder { font-size:16px !important; opacity:.75; }
+
+      /* Contained working area */
+      .app-shell {
+        max-width: 820px;
+        margin: 0 auto 28px auto;
+        padding: 18px 18px 20px 18px;
+        border-radius: 14px;
+        border: 1px solid var(--card-border-light);
+        background: var(--card-bg-light);
+      }
+      @media (prefers-color-scheme: dark) {
+        .app-shell {
+          border-color: var(--card-border-dark);
+          background: var(--card-bg-dark);
+        }
+      }
+
+      /* Sub-containers for inputs and results */
+      .card {
+        border: 1px solid var(--card-border-light);
+        border-radius: 12px;
+        padding: 14px 14px 10px 14px;
+        margin: 10px 0 14px 0;
+        background: var(--card-bg-light);
+      }
+      @media (prefers-color-scheme: dark) {
+        .card {
+          border-color: var(--card-border-dark);
+          background: rgba(255,255,255,0.02);
+        }
+      }
+
+      /* Streamlit tabs tweaks: add subtle border + radius */
+      div[role="tablist"] {
+        border-bottom: 1px solid var(--card-border-light);
+        margin-bottom: 10px;
+      }
+      @media (prefers-color-scheme: dark) {
+        div[role="tablist"] { border-color: var(--card-border-dark); }
+      }
+      /* Headings inside content */
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        font-size:16px !important; font-weight:600 !important; margin:12px 0 6px 0 !important;
+        font-size:16px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
+      }
+      .stButton button {
+        font-size:16px !important;
+        font-weight:700 !important;
+        border-radius:10px !important;
+        padding: 10px 14px !important;
       }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Header (copy polished) ----------
+# ---------- App shell open ----------
+st.markdown("<div class='app-shell'>", unsafe_allow_html=True)
+
+# ---------- Header (substance-first copy) ----------
 st.markdown(
     """
-    <div style="text-align:center; margin-bottom:1rem;">
-        <div style="font-size:28px; font-weight:800; letter-spacing:0.3px; margin-bottom:2px;">
-            PATHIO
-        </div>
-        <p class="tagline" style="margin:0.2rem 0 0 0;">
-            Smart résumés and cover letters — plus immediate, practical steps to become a stronger candidate.
-        </p>
-        <div style="margin-top:6px; font-size:12px; opacity:0.75;">
-            Launching soon
-        </div>
+    <div style="text-align:center; margin-bottom:.6rem;">
+        <div class="app-title">PATHIO</div>
+        <p class="tagline-hero">Be a better candidate.</p>
+        <p class="value-line">Update your résumé and create a cover letter, plus insights to improve your chances.</p>
+        <p class="instruction">Start with the job you want.</p>
+        <div style="margin-top:6px; font-size:12px; opacity:.75;">Launching soon</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -177,59 +221,53 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# Hide tagline once results are generated
-if st.session_state.get("tailored"):
-    st.markdown("<style>.tagline{display:none !important;}</style>", unsafe_allow_html=True)
-
-# ---------- Inputs ----------
-job_text = st.text_area(
-    "Job description input",
-    key="pasted_job",
-    height=120,
-    placeholder="Paste job listing.",
-    label_visibility="collapsed",
-)
-
-# (Explore jobs link intentionally hidden)
-
-resume_text = st.text_area(
-    "Résumé input",
-    key="pasted_resume",
-    height=160,
-    placeholder="Paste résumé.",
-    label_visibility="collapsed",
-)
-
-# ---------- Tailor action ----------
-if st.button("Update résumé + create cover letter", key="cta"):
-    resume_txt = (st.session_state.get("pasted_resume") or "").strip()
-    job_txt = (st.session_state.get("pasted_job") or "").strip()
-    if not resume_txt or not job_txt:
-        st.warning(
-            f"Paste your résumé and the job description first.\n"
-            f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
-        )
-    else:
-        try:
-            with st.spinner("Updating…"):
-                payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
-                r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-                if r.status_code != 200:
-                    st.error(f"Backend error {r.status_code}")
-                    try:
-                        st.write(r.json())
-                    except Exception:
-                        st.write(r.text)
-                else:
-                    data = r.json()
-                    st.session_state["tailored"] = {
-                        "tailored_resume_md": data.get("tailored_resume_md", ""),
-                        "cover_letter_md": data.get("cover_letter_md", ""),
-                    }
-                    st.session_state["insights"] = data.get("insights", {})
-                    st.success("Tailoring complete.")
-        except Exception as e:
-            st.exception(e)
+# ---------- Inputs (card) ----------
+with st.container():
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    job_text = st.text_area(
+        "Job description input",
+        key="pasted_job",
+        height=120,
+        placeholder="Paste job description.",
+        label_visibility="collapsed",
+    )
+    resume_text = st.text_area(
+        "Résumé input",
+        key="pasted_resume",
+        height=160,
+        placeholder="Paste résumé.",
+        label_visibility="collapsed",
+    )
+    if st.button("Update résumé + cover letter", key="cta"):
+        resume_txt = (st.session_state.get("pasted_resume") or "").strip()
+        job_txt = (st.session_state.get("pasted_job") or "").strip()
+        if not resume_txt or not job_txt:
+            st.warning(
+                f"Paste your résumé and the job description first.\n"
+                f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
+            )
+        else:
+            try:
+                with st.spinner("Updating…"):
+                    payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
+                    r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
+                    if r.status_code != 200:
+                        st.error(f"Backend error {r.status_code}")
+                        try:
+                            st.write(r.json())
+                        except Exception:
+                            st.write(r.text)
+                    else:
+                        data = r.json()
+                        st.session_state["tailored"] = {
+                            "tailored_resume_md": data.get("tailored_resume_md", ""),
+                            "cover_letter_md": data.get("cover_letter_md", ""),
+                        }
+                        st.session_state["insights"] = data.get("insights", {})
+                        st.success("Tailoring complete.")
+            except Exception as e:
+                st.exception(e)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Helper: split out What changed
 def split_what_changed(md: str):
@@ -274,7 +312,7 @@ def split_summary(md: str):
     rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
     return summary_md, rest_md
 
-# ---------- Output (TABS) ----------
+# ---------- Output (TABS in their own card) ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -282,17 +320,19 @@ if not tailored:
     st.caption("＋ insights and clear steps to improve your match for the role.")
 
 if tailored:
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+
     resume_md_full = tailored.get("tailored_resume_md", "")
     main_md, changes_md = split_what_changed(resume_md_full)
     summary_md, body_md = split_summary(main_md)
     cover_md = tailored.get("cover_letter_md", "")
 
-    # Build tabs list dynamically (hide 'What changed' if not present)
+    # dynamic tabs
     tab_labels = ["Résumé", "Cover Letter", "Downloads"]
     if changes_md:
         tab_labels.append("What changed")
     tab_labels.append("Insights")
-    tab_labels.append("Be a better candidate")  # NEW dedicated tab
+    tab_labels.append("Be a better candidate")
     tabs = st.tabs(tab_labels)
 
     # --- Résumé tab ---
@@ -312,8 +352,7 @@ if tailored:
     # --- Downloads tab ---
     with tabs[2]:
         st.subheader("Downloads (.docx)")
-        # Use FULL resume for download (includes "What changed")
-        resume_md = resume_md_full
+        resume_md = resume_md_full  # include the original full resume md; backend export cleans it
 
         sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
         if st.session_state.get("docx_sig") != sig:
@@ -359,7 +398,7 @@ if tailored:
                 key="dl_cover",
             )
 
-    # --- What changed tab (only if present) ---
+    # --- What changed tab (optional) ---
     next_idx = 3
     if changes_md:
         with tabs[next_idx]:
@@ -395,7 +434,7 @@ if tailored:
         else:
             st.info("Passed automated parsing checks (ATS).")
 
-    # --- Be a better candidate tab (NEW) ---
+    # --- Be a better candidate tab ---
     with tabs[next_idx + 1]:
         try:
             if isinstance(insights, str):
@@ -420,3 +459,8 @@ if tailored:
                 for text in do_long:
                     href = f"?view=chat&prompt={quote(str(text))}"
                     st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
+
+    st.markdown("</div>", unsafe_allow_html=True)  # close results card
+
+# ---------- App shell close ----------
+st.markdown("</div>", unsafe_allow_html=True)
