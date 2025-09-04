@@ -169,7 +169,7 @@ st.markdown(
       div[role="region"][aria-label][tabindex="-1"] {
         padding: 14px 16px !important;
         background: var(--white) !important;
-        border: 1px solid var(--border) !important;
+        border: 0px solid var(--border) !important;
         border-radius: 14px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.02);
         overflow: hidden; /* prevents inner background peeking at rounded corners */
@@ -213,9 +213,10 @@ st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
-      <div class="tagline">
-        Tailor your résumé + generate cover letter + what to do
-      now to be a better candidate.
+      <div class="tagline" style="line-height:1.5; font-weight:400;">
+        ✔ Tailor your résumé<br>
+        ✔ Generate a cover letter<br>
+        ✔ Get clear next steps to be a stronger candidate
       </div>
     </div>
     """,
@@ -249,8 +250,7 @@ with st.container(border=True):
 with st.container(border=True):
     st.markdown(
         "<div class='step-row'><div class='step-badge'>2</div>"
-        "<div class='step-title'>Then paste your résumé</div>"
-        "<div class='step-hint'>Paste résumé.</div></div>",
+        "<div class='step-title'>Then paste your résumé</div>",
         unsafe_allow_html=True,
     )
     resume_text = st.text_area(
