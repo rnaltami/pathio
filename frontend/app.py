@@ -13,7 +13,7 @@ from urllib.parse import quote, unquote
 # =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
-st.caption(f"Using backend: {backend_url}")
+#-----st.caption(f"Using backend: {backend_url}")----
 
 # =====================================================
 # ALT VIEWS
@@ -214,8 +214,8 @@ st.markdown(
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
       <div class="tagline">
-        Tailor your résumé to the job you want + generate a cover letter and get immediate steps
-        to becoming a better candidate for the job.
+        Tailor your résumé + generate cover letter + what to do
+      now to be a better candidate.
       </div>
     </div>
     """,
@@ -241,7 +241,7 @@ with st.container(border=True):
         "Job description input",
         key="pasted_job",
         height=140,
-        placeholder="Paste job description.",
+       # placeholder="Paste job description.",
         label_visibility="collapsed",
     )
 
@@ -257,7 +257,7 @@ with st.container(border=True):
         "Résumé input",
         key="pasted_resume",
         height=160,
-        placeholder="Paste résumé.",
+        # placeholder="Paste résumé.",
         label_visibility="collapsed",
     )
 
