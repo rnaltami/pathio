@@ -1,4 +1,4 @@
-# app.py — overlay job placeholder, step cards, blue palette, tabs intact
+# app.py — step badges layout, blue palette, tagline restored, CTA refined
 import os
 import json
 import html
@@ -14,9 +14,6 @@ from urllib.parse import quote, unquote
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 st.caption(f"Using backend: {backend_url}")
-
-# Feature flag for overlay placeholder on Job box
-OVERLAY_JOB = True
 
 # =====================================================
 # ALT VIEWS
@@ -86,9 +83,11 @@ if qp.get("view") == "chat":
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
-                    r = requests.post(f"{backend_url}/coach",
-                                      json={"messages": st.session_state["chat_messages"]},
-                                      timeout=120)
+                    r = requests.post(
+                        f"{backend_url}/coach",
+                        json={"messages": st.session_state["chat_messages"]},
+                        timeout=120,
+                    )
                     r.raise_for_status()
                     data = r.json()
                     reply = (data.get("reply") or "").strip() or (
@@ -138,6 +137,9 @@ st.markdown(
       /* Logo word: slightly bigger, slightly lighter weight */
       .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
 
+      /* Tagline */
+      .tagline { font-size:20px; font-weight:700; margin:.35rem 0 .6rem 0; }
+
       /* Headings */
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         font-size:18px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
@@ -169,7 +171,7 @@ st.markdown(
         border-radius: 14px !important;
       }
 
-      /* Tabs: single blue underline, no red */
+      /* Tabs: single blue underline */
       div[role="tablist"]{ border-bottom: 1px solid var(--border); margin-bottom: 10px; }
       button[role="tab"]{ color: var(--ink-600) !important; }
       button[role="tab"][aria-selected="true"]{
@@ -186,7 +188,7 @@ st.markdown(
       }
       .stButton button:hover{ filter: brightness(0.97); }
 
-      /* Step badges and overlay hint */
+      /* Step badges */
       .step-row { display:flex; align-items:center; gap:.5rem; margin: 2px 2px 8px 2px; }
       .step-badge {
         display:inline-flex; align-items:center; justify-content:center;
@@ -196,25 +198,18 @@ st.markdown(
       }
       .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
       .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
-
-      .overlay-wrap { position: relative; }
-      .overlay-hint {
-        position: absolute; inset: 12px 14px auto 14px;
-        pointer-events: none; line-height: 1.35;
-      }
-      .overlay-strong { font-weight: 700; color: var(--ink-900); display:block; }
-      .overlay-light  { font-weight: 500; color: var(--ink-600); display:block; }
     </style>
     <div class="app"></div>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Header (logo only) ----------
+# ---------- Header (logo + tagline) ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
+      <div class="tagline">Be a better candidate.</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -226,8 +221,8 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (step cards; Job uses overlay placeholder if enabled) ----------
-# STEP 1 — JOB (pure step card, no overlay)
+# ---------- Inputs (two step cards, no overlay) ----------
+# STEP 1 — JOB
 with st.container(border=True):
     st.markdown(
         "<div class='step-row'><div class='step-badge'>1</div>"
@@ -242,18 +237,6 @@ with st.container(border=True):
         placeholder="Paste job description.",
         label_visibility="collapsed",
     )
-
-    if OVERLAY_JOB and not (job_text or "").strip():
-        st.markdown(
-            """
-            <div class="overlay-hint">
-              <span class="overlay-strong">Start with the job you want</span>
-              <span class="overlay-light">Paste job description.</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    st.markdown("</div>", unsafe_allow_html=True)  # close overlay-wrap
 
 # STEP 2 — RÉSUMÉ
 with st.container(border=True):
@@ -271,8 +254,9 @@ with st.container(border=True):
         label_visibility="collapsed",
     )
 
-# CTA (separate so it doesn’t visually attach to step 2)
-if st.button("Update résumé + cover letter", key="cta"):
+# CTA (kept separate so it doesn’t visually attach to step 2)
+cta_label = "Update résumé + create cover letter + insights"
+if st.button(cta_label, key="cta"):
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
     if not resume_txt or not job_txt:
