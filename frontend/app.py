@@ -182,7 +182,17 @@ st.markdown(
         color: var(--ink-900) !important;
         border-bottom: 2px solid var(--blue-500) !important;
         font-weight: 700 !important;
+        box-shadow: none !important;
       }
+      .update-banner {
+        background: var(--blue-100);
+        color: var(--blue-600);
+        font-weight: 600;
+        padding: 10px 14px;
+        border-radius: 10px;
+        margin-top: 10px;
+        text-align: center;
+       }
 
       /* CTA button: dark blue solid, white text */
       .stButton button{
@@ -289,7 +299,10 @@ if st.button(cta_label, key="cta"):
                         "cover_letter_md": data.get("cover_letter_md", ""),
                     }
                     st.session_state["insights"] = data.get("insights", {})
-                    st.success("Tailoring complete.")
+                    st.markdown(
+    "<div class='update-banner'>Updating complete.</div>",
+    unsafe_allow_html=True,
+)
         except Exception as e:
             st.exception(e)
 
@@ -358,7 +371,7 @@ if tailored:
                 st.subheader("Summary")
                 st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
                 st.divider()
-            st.subheader("Résumé")
+            st.subheader("Updated Résumé")
             st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
         # Cover letter
