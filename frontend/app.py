@@ -1,4 +1,4 @@
-# app.py — uniform typography, blue-only tabs, blue update banner, no card borders
+# app.py — pill tabs, no update banner, no inner tab headings, copy tweaks
 import os
 import json
 import html
@@ -111,18 +111,19 @@ if qp.get("view") == "future":
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# ---------- Style Bible (blue palette, consistent sizes) ----------
+# ---------- Style Bible ----------
 st.markdown(
     """
     <style>
       :root{
+        --blue-700:#1d3a9b;
         --blue-600:#1e40af;   /* dark blue */
-        --blue-500:#2563eb;   /* accent blue for focus/underline */
-        --blue-100:#eef4ff;   /* very light blue tint */
+        --blue-500:#2563eb;   /* accent */
+        --blue-100:#eef4ff;   /* very light */
         --ink-900:#0f172a;    /* text */
         --ink-700:#334155;    /* tagline subtle */
-        --ink-600:#475569;    /* secondary text */
-        --border:#e6edf7;     /* softened border */
+        --ink-600:#475569;    /* secondary */
+        --border:#e6edf7;     /* soft border */
         --white:#ffffff;
       }
 
@@ -134,15 +135,13 @@ st.markdown(
         color: var(--ink-900);
       }
 
-      /* Logo word */
+      /* Logo */
       .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
 
-      /* Tagline (lighter weight) */
-      .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1.0rem 0; line-height:1.5; }
+      /* Tagline */
+      .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1rem 0; line-height:1.5; }
 
-      /* Uniform markdown typography:
-         - body (p, li) 13px equals inputs
-         - headings 16px equals tagline size (bold) */
+      /* Uniform body / headings */
       .stMarkdown p, .stMarkdown li { font-size:13px !important; }
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         font-size:16px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
@@ -156,59 +155,41 @@ st.markdown(
         border-radius: 12px !important;
       }
       textarea::placeholder, .stTextInput input::placeholder {
-        color: var(--ink-600) !important;
-        opacity:.9 !important;
-        font-size:15px !important;
+        color: var(--ink-600) !important; opacity:.9 !important; font-size:15px !important;
       }
 
-      /* REMOVE card borders entirely (no card chrome around inputs / results) */
+      /* Remove Streamlit card chrome */
       .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf,
       div[role="region"][aria-label][tabindex="-1"] {
-        padding: 0 !important;
-        background: transparent !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        overflow: visible !important;
+        padding: 0 !important; background: transparent !important; border: 0 !important;
+        border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
       }
 
-      /* Tabs: force blue-only underline, remove any red/box-shadow */
-      div[role="tablist"]{ border-bottom: 1px solid var(--border) !important; margin-bottom: 10px !important; }
+      /* Pill tabs */
+      div[role="tablist"]{
+        display:flex; gap:6px; padding:6px; border:0 !important; background: var(--blue-100);
+        border-radius: 12px; margin-bottom: 12px;
+      }
       button[role="tab"]{
-        color: var(--ink-600) !important;
-        box-shadow: none !important;
-        outline: none !important;
-        border: 0 !important;
+        color: var(--blue-600) !important;
         background: transparent !important;
+        border-radius: 10px !important;
+        padding: 6px 10px !important;
+        box-shadow: none !important; border: 0 !important; outline: none !important;
       }
       button[role="tab"][aria-selected="true"]{
-        color: var(--ink-900) !important;
-        box-shadow: none !important;
-        outline: none !important;
-        border-bottom: 2px solid var(--blue-500) !important;
+        background: var(--white) !important;
+        color: var(--blue-700) !important;
+        border: 1px solid var(--border) !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,.03) !important;
       }
 
-      /* Replace Streamlit alert greens with our palette by neutralizing stAlert styles */
-      .stAlert {
-        background: var(--blue-100) !important;
-        color: var(--ink-900) !important;
-        border: 0 !important;
-        border-radius: 10px !important;
-      }
+      /* Alerts -> neutralized (no green) */
+      .stAlert { background: var(--blue-100) !important; color: var(--ink-900) !important;
+                 border: 0 !important; border-radius: 10px !important; }
       .stAlert div { font-size:13px !important; }
 
-      /* Custom blue banner */
-      .update-banner {
-        background: var(--blue-100);
-        color: var(--blue-600);
-        font-weight: 600;
-        padding: 10px 14px;
-        border-radius: 10px;
-        margin-top: 10px;
-        text-align: center;
-      }
-
-      /* CTA button */
+      /* Button */
       .stButton button{
         font-size:16px !important; font-weight:700 !important;
         border-radius: 12px !important; padding: 10px 16px !important;
@@ -221,8 +202,7 @@ st.markdown(
       .step-badge {
         display:inline-flex; align-items:center; justify-content:center;
         width:24px; height:24px; border-radius:999px;
-        background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px;
-        border: 0;
+        background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px; border: 0;
       }
       .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
       .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
@@ -232,7 +212,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- Header (logo + heavy-check tagline) ----------
+# ---------- Header ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
@@ -253,7 +233,7 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (flat layout: no outer card borders) ----------
+# ---------- Inputs (flat) ----------
 # STEP 1 — JOB
 st.markdown(
     "<div class='step-row'><div class='step-badge'>1</div>"
@@ -265,21 +245,19 @@ job_text = st.text_area(
     "Job description input",
     key="pasted_job",
     height=140,
-    # placeholder="Paste job description.",  # optional
     label_visibility="collapsed",
 )
 
 # STEP 2 — RÉSUMÉ
 st.markdown(
     "<div class='step-row'><div class='step-badge'>2</div>"
-    "<div class='step-title'>Then paste your résumé</div></div>",
+    "<div class='step-title'>Paste your résumé</div></div>",
     unsafe_allow_html=True,
 )
 resume_text = st.text_area(
     "Résumé input",
     key="pasted_resume",
     height=160,
-    # placeholder="Paste résumé.",
     label_visibility="collapsed",
 )
 
@@ -288,7 +266,6 @@ if st.button("Go", key="cta"):
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
     if not resume_txt or not job_txt:
-        # Keep Streamlit warning for logic, but it's styled to blue via .stAlert override
         st.warning(
             f"Paste your résumé and the job description first.\n"
             f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
@@ -305,8 +282,6 @@ if st.button("Go", key="cta"):
                     "cover_letter_md": data.get("cover_letter_md", ""),
                 }
                 st.session_state["insights"] = data.get("insights", {})
-            # Blue banner (no green)
-            st.markdown("<div class='update-banner'>Updating complete.</div>", unsafe_allow_html=True)
         except Exception as e:
             st.exception(e)
 
@@ -337,14 +312,10 @@ def split_summary(md: str):
     while end < len(lines):
         s = lines[end].strip()
         if s == "":
-            end += 1
-            continue
+            end += 1; continue
         if s.startswith(("-", "•", "*")):
-            saw_bullet = True
-            end += 1
-            continue
-        if saw_bullet:
-            break
+            saw_bullet = True; end += 1; continue
+        if saw_bullet: break
         break
     summary_md = "\n".join(lines[start:end]).strip()
     if summary_md.lower().strip() == "**summary**":
@@ -362,30 +333,27 @@ if tailored:
     summary_md, body_md = split_summary(main_md)
     cover_md = tailored.get("cover_letter_md", "")
 
-    # Flat tabs (no card border)
-    tab_labels = ["Résumé", "Cover Letter", "Downloads"]
+    # Pill tabs
+    tab_labels = ["Updated résumé", "Cover letter", "Downloads"]
     if changes_md:
         tab_labels.append("What changed")
     tab_labels += ["Insights", "Be a better candidate"]
     tabs = st.tabs(tab_labels)
 
-    # Résumé
+    # Updated résumé
     with tabs[0]:
         if summary_md:
-            st.subheader("Summary")
+            # no "Summary" header; just content
             st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
             st.divider()
-        st.subheader("Updated Résumé")
         st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
     # Cover letter
     with tabs[1]:
-        st.subheader("Cover letter")
         st.markdown(cover_md, unsafe_allow_html=False)
 
     # Downloads
     with tabs[2]:
-        st.subheader("Downloads")
         resume_md = resume_md_full
         sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
         if st.session_state.get("docx_sig") != sig:
@@ -435,7 +403,6 @@ if tailored:
     idx = 3
     if changes_md:
         with tabs[idx]:
-            st.subheader("What changed")
             st.markdown(changes_md, unsafe_allow_html=False)
         idx += 1
 
@@ -450,13 +417,10 @@ if tailored:
         missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
 
-        st.subheader("Match")
-        st.write(f"**Match score:** {score}%")
+        st.markdown(f"**Match score:** {score}%")
         st.progress(max(0, min(score, 100)) / 100.0)
 
-        st.subheader("Keywords & checks")
         if missing:
-            # Use neutral list, not green success box
             st.markdown("**Missing keywords**")
             st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
         else:
@@ -478,7 +442,6 @@ if tailored:
         do_now = list((insights or {}).get("do_now") or [])
         do_long = list((insights or {}).get("do_long") or [])
 
-        st.subheader("Be a better candidate")
         if not (do_now or do_long):
             st.markdown("_No action suggestions available yet._")
         else:
