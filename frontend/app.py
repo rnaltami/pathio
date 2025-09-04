@@ -177,6 +177,8 @@ st.markdown(
         padding: 6px 10px !important;
         box-shadow: none !important; border: 0 !important; outline: none !important;
       }
+       button[role="tab"]::after { display:none !important; }
+    
       button[role="tab"][aria-selected="true"]{
         background: var(--white) !important;
         color: var(--blue-700) !important;
@@ -196,8 +198,6 @@ st.markdown(
         background: var(--blue-600) !important; color: #fff !important; border: 1px solid var(--blue-600) !important;
       }
       .stButton button:hover{ filter: brightness(0.97); }
-
-      button[role="tab"]::after { display:none !important; }
 
 
       /* Step badges */
