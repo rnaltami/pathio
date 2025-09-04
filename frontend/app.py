@@ -1,4 +1,4 @@
-# app.py — Tabs layout + refreshed copy + contained working area (light borders)
+# app.py — centered layout, native bordered cards, tasteful polish, tabs kept
 import os
 import json
 import html
@@ -14,7 +14,6 @@ from urllib.parse import quote, unquote
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 
-# Tiny debug so you can confirm which backend is in use
 st.caption(f"Using backend: {backend_url}")
 
 # =====================================================
@@ -31,7 +30,6 @@ if qp.get("view") == "chat":
         layout="centered",
     )
 
-    # modest chat heading
     st.markdown(
         """
         <style>
@@ -109,7 +107,7 @@ if qp.get("view") == "chat":
 
     st.stop()
 
-# ----- Future jobs placeholder (?view=future) -----
+# Hidden future page
 if qp.get("view") == "future":
     st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
     st.title("Explore future jobs")
@@ -121,95 +119,78 @@ if qp.get("view") == "future":
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# ---------- Global style (contained working area, typographic cleanup) ----------
+# ---------- Global polish ----------
 st.markdown(
     """
     <style>
-      :root {
-        --card-bg-light: #ffffff;
-        --card-bg-dark: #0b0f19;
-        --card-border-light: rgba(0,0,0,.08);
-        --card-border-dark: rgba(255,255,255,.10);
-      }
-      /* Base typography */
-      .app-shell, .app-shell * {
+      /* Center the main column, keep it airy */
+      .main .block-container { max-width: 860px; padding-top: 2.0rem; padding-bottom: 2.0rem; }
+
+      /* System stack, consistent weights */
+      .app * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
           Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
       }
-      .app-title { font-size:28px; font-weight:800; letter-spacing:.3px; margin:0; }
-      .tagline-hero { font-size:20px; font-weight:700; margin:.35rem 0 .1rem 0; }
-      .value-line { font-size:14px; font-weight:500; opacity:.95; margin:.35rem 0 .6rem 0; }
+
+      /* Headline group */
+      .brand { font-size:28px; font-weight:800; letter-spacing:.2px; margin:0; }
+      .tagline { font-size:20px; font-weight:700; margin:.35rem 0 .1rem 0; }
+      .value { font-size:14px; font-weight:500; margin:.35rem 0 .6rem 0; opacity:.95; }
       .instruction { font-size:13px; opacity:.85; margin:0; }
 
       textarea, .stTextInput input { font-size:13px !important; }
       textarea::placeholder, .stTextInput input::placeholder { font-size:16px !important; opacity:.75; }
 
-      /* Contained working area */
-      .app-shell {
-        max-width: 820px;
-        margin: 0 auto 28px auto;
-        padding: 18px 18px 20px 18px;
+      /* Native bordered containers: add padding + subtle shadow + large radius */
+      [data-testid="stContainer"][aria-expanded="true"] > div,  /* collapsers */
+      div[data-testid="stVerticalBlock"] > div:has(> div [data-testid="stTabs"]) /* results card with tabs */ {
         border-radius: 14px;
-        border: 1px solid var(--card-border-light);
-        background: var(--card-bg-light);
-      }
-      @media (prefers-color-scheme: dark) {
-        .app-shell {
-          border-color: var(--card-border-dark);
-          background: var(--card-bg-dark);
-        }
       }
 
-      /* Sub-containers for inputs and results */
-      .card {
-        border: 1px solid var(--card-border-light);
-        border-radius: 12px;
-        padding: 14px 14px 10px 14px;
-        margin: 10px 0 14px 0;
-        background: var(--card-bg-light);
-      }
-      @media (prefers-color-scheme: dark) {
-        .card {
-          border-color: var(--card-border-dark);
-          background: rgba(255,255,255,0.02);
-        }
+      /* Use Streamlit's border=True; we just refine padding & shadow */
+      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf {
+        padding: 14px 16px !important; /* container inner padding */
       }
 
-      /* Streamlit tabs tweaks: add subtle border + radius */
+      /* Subtle elevation on any bordered container (works broadly across themes) */
+      div[role="region"][aria-label][tabindex="-1"] {
+        box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 24px rgba(0,0,0,.04);
+      }
+
+      /* Tabs: make active tab clearer, keep minimal */
       div[role="tablist"] {
-        border-bottom: 1px solid var(--card-border-light);
+        border-bottom: 1px solid rgba(0,0,0,.08);
         margin-bottom: 10px;
       }
-      @media (prefers-color-scheme: dark) {
-        div[role="tablist"] { border-color: var(--card-border-dark); }
-      }
-      /* Headings inside content */
-      .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        font-size:16px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
+      button[role="tab"][aria-selected="true"] {
+        border-bottom: 2px solid #2563eb !important;  /* single accent */
+        font-weight: 700 !important;
       }
       .stButton button {
         font-size:16px !important;
         font-weight:700 !important;
-        border-radius:10px !important;
-        padding: 10px 14px !important;
+        border-radius: 12px !important;
+        padding: 10px 16px !important;
+        background: #2563eb22;  /* soft tint */
+        border: 1px solid #2563eb55;
       }
+      .stButton button:hover { filter: brightness(0.98); }
+      .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { font-size:16px !important; font-weight:700 !important; }
     </style>
+    <div class="app"></div>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- App shell open ----------
-st.markdown("<div class='app-shell'>", unsafe_allow_html=True)
-
-# ---------- Header (substance-first copy) ----------
+# ---------- Header ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
-        <div class="app-title">PATHIO</div>
-        <p class="tagline-hero">Be a better candidate.</p>
-        <p class="value-line">Update your résumé and create a cover letter, plus insights to improve your chances.</p>
-        <p class="instruction">Start with the job you want.</p>
-        <div style="margin-top:6px; font-size:12px; opacity:.75;">Launching soon</div>
+      <div class="brand">PATHIO</div>
+      <p class="tagline">Be a better candidate.</p>
+      <p class="value">Update your résumé and create a cover letter, plus insights to improve your chances.</p>
+      <p class="instruction">Start with the job you want.</p>
+      <div style="margin-top:6px; font-size:12px; opacity:.75;">Launching soon</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -221,9 +202,8 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (card) ----------
-with st.container():
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
+# ---------- Inputs (native bordered card; no empty wrappers) ----------
+with st.container(border=True):
     job_text = st.text_area(
         "Job description input",
         key="pasted_job",
@@ -267,9 +247,8 @@ with st.container():
                         st.success("Tailoring complete.")
             except Exception as e:
                 st.exception(e)
-    st.markdown("</div>", unsafe_allow_html=True)
 
-# Helper: split out What changed
+# Helpers
 def split_what_changed(md: str):
     if not md:
         return "", None
@@ -280,7 +259,6 @@ def split_what_changed(md: str):
     changes_md = md[m.start():].lstrip()
     return main_md, changes_md
 
-# Helper: split out **Summary**
 def split_summary(md: str):
     if not md:
         return None, md
@@ -312,7 +290,7 @@ def split_summary(md: str):
     rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
     return summary_md, rest_md
 
-# ---------- Output (TABS in their own card) ----------
+# ---------- Results (only render card if we have content) ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -320,147 +298,139 @@ if not tailored:
     st.caption("＋ insights and clear steps to improve your match for the role.")
 
 if tailored:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-
     resume_md_full = tailored.get("tailored_resume_md", "")
     main_md, changes_md = split_what_changed(resume_md_full)
     summary_md, body_md = split_summary(main_md)
     cover_md = tailored.get("cover_letter_md", "")
 
-    # dynamic tabs
-    tab_labels = ["Résumé", "Cover Letter", "Downloads"]
-    if changes_md:
-        tab_labels.append("What changed")
-    tab_labels.append("Insights")
-    tab_labels.append("Be a better candidate")
-    tabs = st.tabs(tab_labels)
+    with st.container(border=True):
+        # Dynamic tabs
+        tab_labels = ["Résumé", "Cover Letter", "Downloads"]
+        if changes_md:
+            tab_labels.append("What changed")
+        tab_labels += ["Insights", "Be a better candidate"]
+        tabs = st.tabs(tab_labels)
 
-    # --- Résumé tab ---
-    with tabs[0]:
-        if summary_md:
-            st.subheader("Summary")
-            st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
-            st.divider()
-        st.subheader("Tailored résumé (preview)")
-        st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
+        # Résumé tab
+        with tabs[0]:
+            if summary_md:
+                st.subheader("Summary")
+                st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
+                st.divider()
+            st.subheader("Tailored résumé (preview)")
+            st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
-    # --- Cover Letter tab ---
-    with tabs[1]:
-        st.subheader("Cover letter (preview)")
-        st.markdown(cover_md, unsafe_allow_html=False)
+        # Cover Letter tab
+        with tabs[1]:
+            st.subheader("Cover letter (preview)")
+            st.markdown(cover_md, unsafe_allow_html=False)
 
-    # --- Downloads tab ---
-    with tabs[2]:
-        st.subheader("Downloads (.docx)")
-        resume_md = resume_md_full  # include the original full resume md; backend export cleans it
+        # Downloads tab
+        with tabs[2]:
+            st.subheader("Downloads (.docx)")
+            resume_md = resume_md_full  # backend cleans for export
 
-        sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
-        if st.session_state.get("docx_sig") != sig:
-            st.session_state["docx_sig"] = sig
-            st.session_state["resume_docx"] = None
-            st.session_state["cover_docx"] = None
+            sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
+            if st.session_state.get("docx_sig") != sig:
+                st.session_state["docx_sig"] = sig
+                st.session_state["resume_docx"] = None
+                st.session_state["cover_docx"] = None
 
-        if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
-            with st.spinner("Preparing downloads…"):
-                try:
-                    for which in ("resume", "cover"):
-                        payload = {
-                            "tailored_resume_md": resume_md,
-                            "cover_letter_md": cover_md,
-                            "which": which,
-                        }
-                        rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
-                        rr.raise_for_status()
-                        if which == "resume":
-                            st.session_state["resume_docx"] = rr.content
-                        else:
-                            st.session_state["cover_docx"] = rr.content
-                except Exception as e:
-                    st.error(f"Export failed: {e}")
+            if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
+                with st.spinner("Preparing downloads…"):
+                    try:
+                        for which in ("resume", "cover"):
+                            payload = {
+                                "tailored_resume_md": resume_md,
+                                "cover_letter_md": cover_md,
+                                "which": which,
+                            }
+                            rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+                            rr.raise_for_status()
+                            if which == "resume":
+                                st.session_state["resume_docx"] = rr.content
+                            else:
+                                st.session_state["cover_docx"] = rr.content
+                    except Exception as e:
+                        st.error(f"Export failed: {e}")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                "Download résumé",
-                data=st.session_state.get("resume_docx") or b"",
-                file_name="pathio_resume.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("resume_docx") is None,
-                key="dl_resume",
-            )
-        with col2:
-            st.download_button(
-                "Download cover letter",
-                data=st.session_state.get("cover_docx") or b"",
-                file_name="pathio_cover_letter.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("cover_docx") is None,
-                key="dl_cover",
-            )
+            c1, c2 = st.columns(2)
+            with c1:
+                st.download_button(
+                    "Download résumé",
+                    data=st.session_state.get("resume_docx") or b"",
+                    file_name="pathio_resume.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    disabled=st.session_state.get("resume_docx") is None,
+                    key="dl_resume",
+                )
+            with c2:
+                st.download_button(
+                    "Download cover letter",
+                    data=st.session_state.get("cover_docx") or b"",
+                    file_name="pathio_cover_letter.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    disabled=st.session_state.get("cover_docx") is None,
+                    key="dl_cover",
+                )
 
-    # --- What changed tab (optional) ---
-    next_idx = 3
-    if changes_md:
-        with tabs[next_idx]:
-            st.subheader("What changed")
-            st.markdown(changes_md, unsafe_allow_html=False)
-        next_idx += 1
+        # What changed tab (optional)
+        idx = 3
+        if changes_md:
+            with tabs[idx]:
+                st.subheader("What changed")
+                st.markdown(changes_md, unsafe_allow_html=False)
+            idx += 1
 
-    # --- Insights tab ---
-    with tabs[next_idx]:
-        try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
-        except Exception:
-            insights = {}
+        # Insights tab
+        with tabs[idx]:
+            try:
+                if isinstance(insights, str):
+                    insights = json.loads(insights)
+            except Exception:
+                insights = {}
 
-        score = int((insights or {}).get("match_score") or 0)
-        missing = list((insights or {}).get("missing_keywords") or [])
-        flags = list((insights or {}).get("ats_flags") or [])
+            score = int((insights or {}).get("match_score") or 0)
+            missing = list((insights or {}).get("missing_keywords") or [])
+            flags = list((insights or {}).get("ats_flags") or [])
 
-        st.subheader("Match")
-        st.write(f"**Match score:** {score}%")
-        st.progress(max(0, min(score, 100)) / 100.0)
+            st.subheader("Match")
+            st.write(f"**Match score:** {score}%")
+            st.progress(max(0, min(score, 100)) / 100.0)
 
-        st.subheader("Keywords & checks")
-        if missing:
-            st.warning("Missing keywords")
-            st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
-        else:
-            st.success("No critical keywords missing")
-        if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
-            st.warning("ATS checks")
-            st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
-        else:
-            st.info("Passed automated parsing checks (ATS).")
+            st.subheader("Keywords & checks")
+            if missing:
+                st.warning("Missing keywords")
+                st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
+            else:
+                st.success("No critical keywords missing")
+            if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
+                st.warning("ATS checks")
+                st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
+            else:
+                st.info("Passed automated parsing checks (ATS).")
 
-    # --- Be a better candidate tab ---
-    with tabs[next_idx + 1]:
-        try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
-        except Exception:
-            insights = {}
+        # Be a better candidate tab
+        with tabs[idx + 1]:
+            try:
+                if isinstance(insights, str):
+                    insights = json.loads(insights)
+            except Exception:
+                insights = {}
+            do_now = list((insights or {}).get("do_now") or [])
+            do_long = list((insights or {}).get("do_long") or [])
 
-        do_now = list((insights or {}).get("do_now") or [])
-        do_long = list((insights or {}).get("do_long") or [])
-
-        st.subheader("Be a better candidate")
-        if not (do_now or do_long):
-            st.info("No action suggestions available yet.")
-        else:
-            if do_now:
-                st.write("**Do these now**")
-                for text in do_now:
-                    href = f"?view=chat&prompt={quote(str(text))}"
-                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
-            if do_long:
-                st.write("**Do these long term**")
-                for text in do_long:
-                    href = f"?view=chat&prompt={quote(str(text))}"
-                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
-
-    st.markdown("</div>", unsafe_allow_html=True)  # close results card
-
-# ---------- App shell close ----------
-st.markdown("</div>", unsafe_allow_html=True)
+            st.subheader("Be a better candidate")
+            if not (do_now or do_long):
+                st.info("No action suggestions available yet.")
+            else:
+                if do_now:
+                    st.write("**Do these now**")
+                    for text in do_now:
+                        href = f"?view=chat&prompt={quote(str(text))}"
+                        st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
+                if do_long:
+                    st.write("**Do these long term**")
+                    for text in do_long:
+                        href = f"?view=chat&prompt={quote(str(text))}"
+                        st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
