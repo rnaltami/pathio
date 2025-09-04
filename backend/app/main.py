@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # =========================
-# Clean /export router (REGISTERED FIRST)
+# CLEAN /export (REGISTERED FIRST)
 # =========================
 export_router = APIRouter()
 
@@ -71,13 +71,12 @@ def _remove_summary_block(md: str) -> str:
             # skip blank lines
             while i < len(lines) and not lines[i].strip():
                 i += 1
-            # consume bullets/paragraph until blank OR clear next header-like line
+            # consume bullets/paragraph until blank OR next clear header-like line
             while i < len(lines):
                 ln = lines[i]
                 if not ln.strip():
                     i += 1
                     break
-                # stop if the next line is clearly a section header
                 hdrish = bool(re.match(r"^\s*#+\s+\S", ln)) or bool(re.match(r"^\s*[*_]{1,3}[^*].*[*_]{1,3}\s*$", ln))
                 if hdrish:
                     break
@@ -140,76 +139,96 @@ def _preprocess_for_cover(md: str) -> str:
 
 @export_router.post("/export")
 def export_doc(req: ExportRequest):
-    if req.which == "resume":
-        content = _preprocess_for_resume(req.tailored_resume_md or "")
-    else:
-        content = _preprocess_for_cover(req.cover_letter_md or "")
+    import logging, traceback, io
+    logger = logging.getLogger("uvicorn.error")  # Render surfaces this
 
-    if not content:
-        return Response(
-            content=b"No content to export.",
-            media_type="text/plain; charset=utf-8",
-            headers={
-                "Content-Disposition": 'attachment; filename="export.txt"',
-                "X-Exporter": "clean",
-            },
-            status_code=400,
-        )
-
-    # Try DOCX; fallback to TXT
     try:
-        from docx import Document  # python-docx
-    except Exception:
+        if req.which == "resume":
+            content = _preprocess_for_resume(req.tailored_resume_md or "")
+        else:
+            content = _preprocess_for_cover(req.cover_letter_md or "")
+
+        if not content:
+            return Response(
+                content=b"No content to export.",
+                media_type="text/plain; charset=utf-8",
+                headers={
+                    "Content-Disposition": 'attachment; filename="export.txt"',
+                    "X-Exporter": "clean",
+                },
+                status_code=400,
+            )
+
+        # Try DOCX; fallback to TXT if python-docx missing
+        try:
+            from docx import Document  # python-docx
+        except Exception:
+            return Response(
+                content=content.encode("utf-8"),
+                media_type="text/plain; charset=utf-8",
+                headers={
+                    "Content-Disposition": 'attachment; filename="export.txt"',
+                    "X-Exporter": "clean",
+                    "X-Exporter-Fallback": "no-docx",
+                },
+            )
+
+        doc = Document()
+        bullet_re = re.compile(r"^\s*[-*•]\s+(.*)$")
+
+        for raw in content.splitlines():
+            line = raw.rstrip("\n")
+
+            # simple heading heuristics
+            if re.match(r"^[A-Z0-9 ,/&()'’.-]{6,}$", line) and line.strip() == line.upper():
+                doc.add_heading(line.strip(), level=2)
+                continue
+            if line.strip().endswith(":") and len(line.strip()) <= 48:
+                doc.add_heading(line.strip().rstrip(":"), level=2)
+                continue
+
+            m = bullet_re.match(line)
+            if m:
+                text = m.group(1).strip()
+                try:
+                    doc.add_paragraph(text, style="List Bullet")
+                except Exception:
+                    doc.add_paragraph("• " + text)
+                continue
+
+            if not line.strip():
+                doc.add_paragraph("")
+                continue
+
+            doc.add_paragraph(line)
+
+        bio = io.BytesIO()
+        doc.save(bio)
+        bio.seek(0)
         return Response(
-            content=content.encode("utf-8"),
-            media_type="text/plain; charset=utf-8",
+            content=bio.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers={
-                "Content-Disposition": 'attachment; filename="export.txt"',
+                "Content-Disposition": 'attachment; filename="pathio_export.docx"',
                 "X-Exporter": "clean",
             },
         )
 
-    doc = Document()
-    bullet_re = re.compile(r"^\s*[-*•]\s+(.*)$")
-
-    for raw in content.splitlines():
-        line = raw.rstrip("\n")
-
-        # simple heading heuristics
-        if re.match(r"^[A-Z0-9 ,/&()'’.-]{6,}$", line) and line.strip() == line.upper():
-            doc.add_heading(line.strip(), level=2)
-            continue
-        if line.strip().endswith(":") and len(line.strip()) <= 48:
-            doc.add_heading(line.strip().rstrip(":"), level=2)
-            continue
-
-        m = bullet_re.match(line)
-        if m:
-            text = m.group(1).strip()
-            try:
-                doc.add_paragraph(text, style="List Bullet")
-            except Exception:
-                doc.add_paragraph("• " + text)
-            continue
-
-        if not line.strip():
-            doc.add_paragraph("")
-            continue
-
-        doc.add_paragraph(line)
-
-    import io
-    bio = io.BytesIO()
-    doc.save(bio)
-    bio.seek(0)
-    return Response(
-        content=bio.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={
-            "Content-Disposition": 'attachment; filename="pathio_export.docx"',
-            "X-Exporter": "clean",
-        },
-    )
+    except Exception as e:
+        # Log full traceback to Render logs AND return a readable text file to the browser
+        logger.exception("EXPORT_FAILED")
+        tb = traceback.format_exc()
+        debug_text = f"EXPORT_ERROR: {e}\n\nTRACEBACK:\n{tb}\n"
+        return Response(
+            content=debug_text.encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="export_error.txt"',
+                "X-Exporter": "clean",
+                "X-Exporter-Error": type(e).__name__,
+            },
+            status_code=200,  # so the frontend download succeeds for inspection
+        )
 
 # Register the CLEAN export router FIRST so it takes precedence
 app.include_router(export_router)
