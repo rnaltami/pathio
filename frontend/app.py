@@ -1,4 +1,4 @@
-# app.py — pill tabs, strict 503 handling, fixed Downloads indentation
+# app.py — disable Go until inputs filled, inline hints, improved error handling
 import os
 import json
 import html
@@ -8,26 +8,16 @@ import streamlit as st
 import re
 from urllib.parse import quote, unquote
 
-# =========================
-# Backend URL
-# =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 
-# =====================================================
-# ALT VIEWS
-# =====================================================
 qp = st.query_params
 
-# ----- Chat helper view (?view=chat&prompt=...) -----
+# ---------- Chat helper view ----------
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-    st.set_page_config(
-        page_title=("How-to" if not seed else f"How-to: {seed}"),
-        page_icon="pathio-logo.png",
-        layout="centered"
-    )
-
+    st.set_page_config(page_title=("How-to" if not seed else f"How-to: {seed}"),
+                       page_icon="pathio-logo.png", layout="centered")
     st.markdown(
         """
         <style>
@@ -43,23 +33,18 @@ if qp.get("view") == "chat":
     st.divider()
 
     st.session_state.setdefault("chat_messages", [])
-
     def fallback_steps(prompt: str) -> str:
         t = (prompt or "").lower()
         if "obs" in t or "live" in t:
-            return (
-                "**Quick plan:**\n"
-                "1) Install OBS; add mic + screen in a Scene.\n"
-                "2) Settings → Output: 720p/30fps; record a 3-min dry run.\n"
-                "3) Watch back; note 3 fixes (audio, framing, hook).\n"
-                "4) Apply fixes; record a second take; save with notes.\n"
-            )
-        return (
-            "**Starter steps:**\n"
-            "1) Break the task into 4–6 steps with outcomes.\n"
-            "2) Timebox step 1 to 20 minutes and start.\n"
-            "3) Save evidence (doc/clip) and iterate once.\n"
-        )
+            return ("**Quick plan:**\n"
+                    "1) Install OBS; add mic + screen in a Scene.\n"
+                    "2) Settings → Output: 720p/30fps; record a 3-min dry run.\n"
+                    "3) Watch back; note 3 fixes (audio, framing, hook).\n"
+                    "4) Apply fixes; record a second take; save with notes.\n")
+        return ("**Starter steps:**\n"
+                "1) Break the task into 4–6 steps with outcomes.\n"
+                "2) Timebox step 1 to 20 minutes and start.\n"
+                "3) Save evidence (doc/clip) and iterate once.\n")
 
     if seed and not st.session_state["chat_messages"]:
         st.session_state["chat_messages"].append({"role": "user", "content": seed})
@@ -85,11 +70,9 @@ if qp.get("view") == "chat":
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
-                    r = requests.post(
-                        f"{backend_url}/coach",
-                        json={"messages": st.session_state["chat_messages"]},
-                        timeout=120,
-                    )
+                    r = requests.post(f"{backend_url}/coach",
+                                      json={"messages": st.session_state["chat_messages"]},
+                                      timeout=120)
                     r.raise_for_status()
                     data = r.json()
                     reply = (data.get("reply") or "").strip() or (
@@ -102,7 +85,7 @@ if qp.get("view") == "chat":
         st.rerun()
     st.stop()
 
-# Hidden future page
+# ---------- Optional future page ----------
 if qp.get("view") == "future":
     st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
     st.title("Explore future jobs")
@@ -114,103 +97,50 @@ if qp.get("view") == "future":
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# ---------- Style Bible ----------
+# ---------- Style ----------
 st.markdown(
     """
     <style>
       :root{
-        --blue-700:#1d3a9b;
-        --blue-600:#1e40af;   /* dark blue */
-        --blue-500:#2563eb;   /* accent */
-        --blue-100:#eef4ff;   /* very light */
-        --ink-900:#0f172a;    /* text */
-        --ink-700:#334155;    /* tagline subtle */
-        --ink-600:#475569;    /* secondary */
-        --border:#e6edf7;     /* soft border */
-        --white:#ffffff;
+        --blue-700:#1d3a9b; --blue-600:#1e40af; --blue-500:#2563eb; --blue-100:#eef4ff;
+        --ink-900:#0f172a; --ink-700:#334155; --ink-600:#475569; --border:#e6edf7; --white:#ffffff;
       }
-
       .main .block-container { max-width: 860px; padding-top: 2rem; padding-bottom: 2rem; }
-
-      .app * {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-          Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
-        color: var(--ink-900);
-      }
-
-      /* Logo */
+      .app * { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,
+                "Open Sans","Helvetica Neue",sans-serif !important; color: var(--ink-900); }
       .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
-
-      /* Tagline */
       .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1rem 0; line-height:1.5; }
-
-      /* Uniform body / headings */
       .stMarkdown p, .stMarkdown li { font-size:13px !important; }
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
         font-size:16px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
       }
-
-      /* Inputs */
       textarea, .stTextInput input {
-        font-size:13px !important;
-        background: var(--white) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 12px !important;
+        font-size:13px !important; background: var(--white) !important;
+        border: 1px solid var(--border) !important; border-radius: 12px !important;
       }
-      textarea::placeholder, .stTextInput input::placeholder {
-        color: var(--ink-600) !important; opacity:.9 !important; font-size:15px !important;
+      textarea::placeholder, .stTextInput input::placeholder { color: var(--ink-600) !important; opacity:.9 !important; font-size:15px !important; }
+      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf, div[role="region"][aria-label][tabindex="-1"]{
+        padding:0 !important; background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; overflow:visible !important;
       }
-
-      /* Remove Streamlit card chrome */
-      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf,
-      div[role="region"][aria-label][tabindex="-1"] {
-        padding: 0 !important; background: transparent !important; border: 0 !important;
-        border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
-      }
-
       /* Pill tabs */
-      div[role="tablist"]{
-        display:flex; gap:6px; padding:6px; border:0 !important; background: var(--blue-100);
-        border-radius: 12px; margin-bottom: 12px;
-      }
-      button[role="tab"]{
-        color: var(--blue-600) !important;
-        background: transparent !important;
-        border-radius: 10px !important;
-        padding: 6px 10px !important;
-        box-shadow: none !important; border: 0 !important; outline: none !important;
-      }
+      div[role="tablist"]{ display:flex; gap:6px; padding:6px; border:0 !important; background:var(--blue-100);
+                           border-radius:12px; margin-bottom:12px; }
+      button[role="tab"]{ color:var(--blue-600) !important; background:transparent !important; border-radius:10px !important;
+                          padding:6px 10px !important; box-shadow:none !important; border:0 !important; outline:none !important; }
       button[role="tab"]::after { display:none !important; }
-
-      button[role="tab"][aria-selected="true"]{
-        background: var(--white) !important;
-        color: var(--blue-700) !important;
-        border: 1px solid var(--border) !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,.03) !important;
-      }
-
-      /* Alerts -> neutralized (no green) */
-      .stAlert { background: var(--blue-100) !important; color: var(--ink-900) !important;
-                 border: 0 !important; border-radius: 10px !important; }
+      button[role="tab"][aria-selected="true"]{ background:var(--white) !important; color:var(--blue-700) !important;
+                                                border:1px solid var(--border) !important; box-shadow:0 1px 2px rgba(0,0,0,.03) !important; }
+      .stAlert { background: var(--blue-100) !important; color: var(--ink-900) !important; border:0 !important; border-radius:10px !important; }
       .stAlert div { font-size:13px !important; }
-
-      /* Button */
-      .stButton button{
-        font-size:16px !important; font-weight:700 !important;
-        border-radius: 12px !important; padding: 10px 16px !important;
-        background: var(--blue-600) !important; color: #fff !important; border: 1px solid var(--blue-600) !important;
-      }
-      .stButton button:hover{ filter: brightness(0.97); }
-
-      /* Step badges */
-      .step-row { display:flex; align-items:center; gap:.5rem; margin: 8px 2px 8px 2px; }
-      .step-badge {
-        display:inline-flex; align-items:center; justify-content:center;
-        width:24px; height:24px; border-radius:999px;
-        background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px; border: 0;
-      }
-      .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
-      .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
+      .stButton button{ font-size:16px !important; font-weight:700 !important; border-radius:12px !important; padding:10px 16px !important;
+                        background:var(--blue-600) !important; color:#fff !important; border:1px solid var(--blue-600) !important; }
+      .stButton button:hover{ filter:brightness(0.97); }
+      .step-row{ display:flex; align-items:center; gap:.5rem; margin:8px 2px 8px 2px; }
+      .step-badge{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:999px;
+                   background:var(--blue-100); color:var(--blue-600); font-weight:700; font-size:12px; border:0; }
+      .step-title{ font-weight:700; font-size:14px; color:var(--ink-900); }
+      .step-hint{ font-weight:500; font-size:13px; color:var(--ink-600); margin-left:.35rem; }
+      .hint-inline{ font-size:12px; color:var(--ink-600); margin-top:4px; }
     </style>
     <div class="app"></div>
     """,
@@ -238,63 +168,62 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (flat) ----------
-# STEP 1 — JOB
+# ---------- Inputs ----------
 st.markdown(
     "<div class='step-row'><div class='step-badge'>1</div>"
     "<div class='step-title'>Start with the job you want</div>"
     "<div class='step-hint'>Paste job description.</div></div>",
     unsafe_allow_html=True,
 )
-job_text = st.text_area(
-    "Job description input",
-    key="pasted_job",
-    height=140,
-    label_visibility="collapsed",
-)
+job_text = st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
+if not (job_text or "").strip():
+    st.markdown("<div class='hint-inline'>This field can’t be empty.</div>", unsafe_allow_html=True)
 
-# STEP 2 — RÉSUMÉ
 st.markdown(
     "<div class='step-row'><div class='step-badge'>2</div>"
     "<div class='step-title'>Paste your résumé</div></div>",
     unsafe_allow_html=True,
 )
-resume_text = st.text_area(
-    "Résumé input",
-    key="pasted_resume",
-    height=160,
-    label_visibility="collapsed",
-)
+resume_text = st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
+if not (resume_text or "").strip():
+    st.markdown("<div class='hint-inline'>This field can’t be empty.</div>", unsafe_allow_html=True)
 
-# CTA
-if st.button("Go", key="cta"):
-    resume_txt = (st.session_state.get("pasted_resume") or "").strip()
-    job_txt = (st.session_state.get("pasted_job") or "").strip()
-    if not resume_txt or not job_txt:
-        st.warning(
-            f"Paste your résumé and the job description first.\n"
-            f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
-        )
-    else:
-        try:
-            with st.spinner("Updating…"):
-                payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
-                r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-                # Graceful strict-mode handling
-                if r.status_code == 503:
-                    st.error("Couldn’t update right now — please try again in a moment.")
-                else:
-                    r.raise_for_status()
+# CTA — disabled until both fields have content
+can_go = bool((job_text or "").strip()) and bool((resume_text or "").strip())
+clicked = st.button("Go", key="cta", disabled=not can_go)
+
+if clicked and can_go:
+    try:
+        with st.spinner("Updating…"):
+            payload = {"resume_text": (resume_text or "").strip(),
+                       "job_text": (job_text or "").strip(),
+                       "user_tweaks": {}}
+            r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
+
+            if r.status_code >= 400:
+                # show backend reason (503 strict mode, or 500)
+                msg = ""
+                try:
                     data = r.json()
-                    st.session_state["tailored"] = {
-                        "tailored_resume_md": data.get("tailored_resume_md", ""),
-                        "cover_letter_md": data.get("cover_letter_md", ""),
-                    }
-                    st.session_state["insights"] = data.get("insights", {})
-        except requests.exceptions.HTTPError as http_err:
-            st.error(f"Update failed ({getattr(http_err.response, 'status_code', 'HTTP error')}). Please try again.")
-        except Exception as e:
-            st.error("Something went wrong while updating. Please try again.")
+                    msg = (data.get("detail") or data.get("error") or "") if isinstance(data, dict) else ""
+                except Exception:
+                    pass
+                if not msg:
+                    try:
+                        msg = r.text
+                    except Exception:
+                        msg = ""
+                st.toast(f"Update failed ({r.status_code}). {msg[:220]}", icon="⚠️")
+                # do NOT mutate results on failure
+            else:
+                data = r.json()
+                st.session_state["tailored"] = {
+                    "tailored_resume_md": data.get("tailored_resume_md", ""),
+                    "cover_letter_md": data.get("cover_letter_md", ""),
+                }
+                st.session_state["insights"] = data.get("insights", {})
+    except Exception:
+        st.toast("Network error during update. Please try again.", icon="⚠️")
 
 # ---------- Helpers ----------
 def split_what_changed(md: str):
@@ -314,18 +243,14 @@ def split_summary(md: str):
     start = None
     for i, line in enumerate(lines):
         if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
-            start = i
-            break
+            start = i; break
     if start is None:
         return None, md
-    end = start + 1
-    saw_bullet = False
+    end = start + 1; saw_bullet = False
     while end < len(lines):
         s = lines[end].strip()
-        if s == "":
-            end += 1; continue
-        if s.startswith(("-", "•", "*")):
-            saw_bullet = True; end += 1; continue
+        if s == "": end += 1; continue
+        if s.startswith(("-", "•", "*")): saw_bullet = True; end += 1; continue
         if saw_bullet: break
         break
     summary_md = "\n".join(lines[start:end]).strip()
@@ -344,28 +269,23 @@ if tailored:
     summary_md, body_md = split_summary(main_md)
     cover_md = tailored.get("cover_letter_md", "")
 
-    # Pill tabs
     tab_labels = ["Updated résumé", "Cover letter", "Downloads"]
     if changes_md:
         tab_labels.append("What changed")
     tab_labels += ["Insights", "Be a better candidate"]
     tabs = st.tabs(tab_labels)
 
-    # Updated résumé
     with tabs[0]:
         if summary_md:
             st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
             st.divider()
         st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
-    # Cover letter
     with tabs[1]:
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads (FIXED INDENTATION)
     with tabs[2]:
-        resume_md = resume_md_full  # backend export will remove Summary / What changed
-
+        resume_md = resume_md_full  # backend export removes Summary / What changed
         sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
         if st.session_state.get("docx_sig") != sig:
             st.session_state["docx_sig"] = sig
@@ -373,11 +293,7 @@ if tailored:
             st.session_state["cover_docx"] = None
 
         def _fetch_doc(which: str, resume_md: str, cover_md: str):
-            payload = {
-                "tailored_resume_md": resume_md,
-                "cover_letter_md": cover_md,
-                "which": which,
-            }
+            payload = {"tailored_resume_md": resume_md, "cover_letter_md": cover_md, "which": which}
             rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
             ctype = (rr.headers.get("Content-Type") or rr.headers.get("content-type") or "").lower()
             x_err = rr.headers.get("X-Exporter-Error")
@@ -394,80 +310,63 @@ if tailored:
                 try:
                     res_bytes, res_err = _fetch_doc("resume", resume_md, cover_md)
                     cov_bytes, cov_err = _fetch_doc("cover", resume_md, cover_md)
-                    if res_err:
-                        st.error(f"Resume export error:\n\n{res_err}")
-                    else:
-                        st.session_state["resume_docx"] = res_bytes
-                    if cov_err:
-                        st.error(f"Cover letter export error:\n\n{cov_err}")
-                    else:
-                        st.session_state["cover_docx"] = cov_bytes
+                    if res_err: st.error(f"Resume export error:\n\n{res_err}")
+                    else: st.session_state["resume_docx"] = res_bytes
+                    if cov_err: st.error(f"Cover letter export error:\n\n{cov_err}")
+                    else: st.session_state["cover_docx"] = cov_bytes
                 except Exception as e:
                     st.error(f"Export failed: {e}")
 
         c1, c2 = st.columns(2)
         with c1:
-            st.download_button(
-                "Download résumé",
-                data=st.session_state.get("resume_docx") or b"",
-                file_name="pathio_resume.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("resume_docx") is None,
-                key="dl_resume",
-            )
+            st.download_button("Download résumé",
+                               data=st.session_state.get("resume_docx") or b"",
+                               file_name="pathio_resume.docx",
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                               disabled=st.session_state.get("resume_docx") is None,
+                               key="dl_resume")
         with c2:
-            st.download_button(
-                "Download cover letter",
-                data=st.session_state.get("cover_docx") or b"",
-                file_name="pathio_cover_letter.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("cover_docx") is None,
-                key="dl_cover",
-            )
+            st.download_button("Download cover letter",
+                               data=st.session_state.get("cover_docx") or b"",
+                               file_name="pathio_cover_letter.docx",
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                               disabled=st.session_state.get("cover_docx") is None,
+                               key="dl_cover")
 
-    # What changed (optional)
     idx = 3
     if changes_md:
         with tabs[idx]:
             st.markdown(changes_md, unsafe_allow_html=False)
         idx += 1
 
-    # Insights
     with tabs[idx]:
         try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
+            if isinstance(insights, str): insights = json.loads(insights)
         except Exception:
             insights = {}
         score = int((insights or {}).get("match_score") or 0)
         missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
-
         st.markdown(f"**Match score:** {score}%")
         st.progress(max(0, min(score, 100)) / 100.0)
-
         if missing:
             st.markdown("**Missing keywords**")
             st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
         else:
             st.markdown("**No critical keywords missing**")
-
         if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
             st.markdown("**ATS checks**")
             st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
         else:
             st.markdown("**Passed automated parsing checks (ATS).**")
 
-    # Be a better candidate
     with tabs[idx + 1]:
         try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
+            if isinstance(insights, str): insights = json.loads(insights)
         except Exception:
             insights = {}
         do_now = list((insights or {}).get("do_now") or [])
         do_long = list((insights or {}).get("do_long") or [])
-
         if not (do_now or do_long):
             st.markdown("_No action suggestions available yet._")
         else:
