@@ -1,4 +1,4 @@
-# app.py — centered layout, native bordered cards, tasteful polish, tabs kept
+# app.py — overlay job placeholder, step cards, blue palette, tabs intact
 import os
 import json
 import html
@@ -9,12 +9,14 @@ import re
 from urllib.parse import quote, unquote
 
 # =========================
-# Backend URL (single source of truth)
+# Backend URL
 # =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
-
 st.caption(f"Using backend: {backend_url}")
+
+# Feature flag for overlay placeholder on Job box
+OVERLAY_JOB = True
 
 # =====================================================
 # ALT VIEWS
@@ -24,11 +26,8 @@ qp = st.query_params
 # ----- Chat helper view (?view=chat&prompt=...) -----
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-    st.set_page_config(
-        page_title=("How-to" if not seed else f"How-to: {seed}"),
-        page_icon="pathio-logo.png",
-        layout="centered",
-    )
+    st.set_page_config(page_title=("How-to" if not seed else f"How-to: {seed}"),
+                       page_icon="pathio-logo.png", layout="centered")
 
     st.markdown(
         """
@@ -67,11 +66,9 @@ if qp.get("view") == "chat":
         st.session_state["chat_messages"].append({"role": "user", "content": seed})
         with st.spinner("Thinking…"):
             try:
-                r = requests.post(
-                    f"{backend_url}/coach",
-                    json={"messages": st.session_state["chat_messages"]},
-                    timeout=60,
-                )
+                r = requests.post(f"{backend_url}/coach",
+                                  json={"messages": st.session_state["chat_messages"]},
+                                  timeout=60)
                 r.raise_for_status()
                 data = r.json()
                 reply = (data.get("reply") or "").strip() or fallback_steps(seed)
@@ -89,11 +86,9 @@ if qp.get("view") == "chat":
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
-                    r = requests.post(
-                        f"{backend_url}/coach",
-                        json={"messages": st.session_state["chat_messages"]},
-                        timeout=120,
-                    )
+                    r = requests.post(f"{backend_url}/coach",
+                                      json={"messages": st.session_state["chat_messages"]},
+                                      timeout=120)
                     r.raise_for_status()
                     data = r.json()
                     reply = (data.get("reply") or "").strip() or (
@@ -104,7 +99,6 @@ if qp.get("view") == "chat":
             st.markdown(reply)
         st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
         st.rerun()
-
     st.stop()
 
 # Hidden future page
@@ -119,78 +113,108 @@ if qp.get("view") == "future":
 # =====================================================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# ---------- Global polish ----------
+# ---------- Style Bible (blue palette, consistent sizes) ----------
 st.markdown(
     """
     <style>
-      /* Center the main column, keep it airy */
-      .main .block-container { max-width: 860px; padding-top: 2.0rem; padding-bottom: 2.0rem; }
+      :root{
+        --blue-600:#1e40af;   /* dark blue */
+        --blue-500:#2563eb;   /* accent blue for focus/underline */
+        --blue-100:#eaf1ff;   /* light blue tint */
+        --ink-900:#0f172a;    /* text */
+        --ink-600:#475569;    /* secondary text */
+        --border:#dbe7ff;     /* light blue border */
+        --white:#ffffff;
+      }
 
-      /* System stack, consistent weights */
+      .main .block-container { max-width: 860px; padding-top: 2rem; padding-bottom: 2rem; }
+
       .app * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
           Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
+        color: var(--ink-900);
       }
 
-      /* Headline group */
-      .brand { font-size:28px; font-weight:800; letter-spacing:.2px; margin:0; }
-      .tagline { font-size:20px; font-weight:700; margin:.35rem 0 .1rem 0; }
-      .value { font-size:14px; font-weight:500; margin:.35rem 0 .6rem 0; opacity:.95; }
-      .instruction { font-size:13px; opacity:.85; margin:0; }
+      /* Logo word: slightly bigger, slightly lighter weight */
+      .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
 
-      textarea, .stTextInput input { font-size:13px !important; }
-      textarea::placeholder, .stTextInput input::placeholder { font-size:16px !important; opacity:.75; }
-
-      /* Native bordered containers: add padding + subtle shadow + large radius */
-      [data-testid="stContainer"][aria-expanded="true"] > div,  /* collapsers */
-      div[data-testid="stVerticalBlock"] > div:has(> div [data-testid="stTabs"]) /* results card with tabs */ {
-        border-radius: 14px;
+      /* Headings */
+      .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        font-size:18px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
       }
 
-      /* Use Streamlit's border=True; we just refine padding & shadow */
+      /* Labels / small text */
+      .label { font-size:13px; color:var(--ink-600); }
+      .para { font-size:14px; }
+
+      /* Inputs: white background, light blue border, gentle radius */
+      textarea, .stTextInput input {
+        font-size:13px !important;
+        background: var(--white) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+      }
+      textarea::placeholder, .stTextInput input::placeholder {
+        color: var(--ink-600) !important;
+        opacity:.9 !important;
+        font-size:15px !important;
+      }
+
+      /* Streamlit bordered containers = cards */
       .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf {
-        padding: 14px 16px !important; /* container inner padding */
+        padding: 14px 16px !important;
+        background: var(--white) !important;
+        border: 1px solid var(--border) !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 6px 24px rgba(0,0,0,.03);
+        border-radius: 14px !important;
       }
 
-      /* Subtle elevation on any bordered container (works broadly across themes) */
-      div[role="region"][aria-label][tabindex="-1"] {
-        box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 24px rgba(0,0,0,.04);
-      }
-
-      /* Tabs: make active tab clearer, keep minimal */
-      div[role="tablist"] {
-        border-bottom: 1px solid rgba(0,0,0,.08);
-        margin-bottom: 10px;
-      }
-      button[role="tab"][aria-selected="true"] {
-        border-bottom: 2px solid #2563eb !important;  /* single accent */
+      /* Tabs: single blue underline, no red */
+      div[role="tablist"]{ border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+      button[role="tab"]{ color: var(--ink-600) !important; }
+      button[role="tab"][aria-selected="true"]{
+        color: var(--ink-900) !important;
+        border-bottom: 2px solid var(--blue-500) !important;
         font-weight: 700 !important;
       }
-      .stButton button {
-        font-size:16px !important;
-        font-weight:700 !important;
-        border-radius: 12px !important;
-        padding: 10px 16px !important;
-        background: #2563eb22;  /* soft tint */
-        border: 1px solid #2563eb55;
+
+      /* CTA button: dark blue solid, white text */
+      .stButton button{
+        font-size:16px !important; font-weight:700 !important;
+        border-radius: 12px !important; padding: 10px 16px !important;
+        background: var(--blue-600) !important; color: #fff !important; border: 1px solid var(--blue-600) !important;
       }
-      .stButton button:hover { filter: brightness(0.98); }
-      .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { font-size:16px !important; font-weight:700 !important; }
+      .stButton button:hover{ filter: brightness(0.97); }
+
+      /* Step badges and overlay hint */
+      .step-row { display:flex; align-items:center; gap:.5rem; margin: 2px 2px 8px 2px; }
+      .step-badge {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:24px; height:24px; border-radius:999px;
+        background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px;
+        border: 1px solid var(--border);
+      }
+      .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
+      .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
+
+      .overlay-wrap { position: relative; }
+      .overlay-hint {
+        position: absolute; inset: 12px 14px auto 14px;
+        pointer-events: none; line-height: 1.35;
+      }
+      .overlay-strong { font-weight: 700; color: var(--ink-900); display:block; }
+      .overlay-light  { font-weight: 500; color: var(--ink-600); display:block; }
     </style>
     <div class="app"></div>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Header ----------
+# ---------- Header (logo only) ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
-      <p class="tagline">Be a better candidate.</p>
-      <p class="value">Update your résumé and create a cover letter, plus insights to improve your chances.</p>
-      <p class="instruction">Start with the job you want.</p>
-      <div style="margin-top:6px; font-size:12px; opacity:.75;">Launching soon</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -202,14 +226,43 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (native bordered card; no empty wrappers) ----------
+# ---------- Inputs (step cards; Job uses overlay placeholder if enabled) ----------
+# STEP 1 — JOB
 with st.container(border=True):
+    st.markdown(
+        "<div class='step-row'><div class='step-badge'>1</div>"
+        "<div class='step-title'>Start with the job you want</div>"
+        "<div class='step-hint'>Paste job description.</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div class='overlay-wrap'>", unsafe_allow_html=True)
     job_text = st.text_area(
         "Job description input",
         key="pasted_job",
-        height=120,
-        placeholder="Paste job description.",
+        height=140,
+        placeholder="",  # leave native placeholder empty so overlay carries the message
         label_visibility="collapsed",
+    )
+    if OVERLAY_JOB and not (job_text or "").strip():
+        st.markdown(
+            """
+            <div class="overlay-hint">
+              <span class="overlay-strong">Start with the job you want</span>
+              <span class="overlay-light">Paste job description.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)  # close overlay-wrap
+
+# STEP 2 — RÉSUMÉ
+with st.container(border=True):
+    st.markdown(
+        "<div class='step-row'><div class='step-badge'>2</div>"
+        "<div class='step-title'>Then paste your résumé</div>"
+        "<div class='step-hint'>Paste résumé.</div></div>",
+        unsafe_allow_html=True,
     )
     resume_text = st.text_area(
         "Résumé input",
@@ -218,37 +271,39 @@ with st.container(border=True):
         placeholder="Paste résumé.",
         label_visibility="collapsed",
     )
-    if st.button("Update résumé + cover letter", key="cta"):
-        resume_txt = (st.session_state.get("pasted_resume") or "").strip()
-        job_txt = (st.session_state.get("pasted_job") or "").strip()
-        if not resume_txt or not job_txt:
-            st.warning(
-                f"Paste your résumé and the job description first.\n"
-                f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
-            )
-        else:
-            try:
-                with st.spinner("Updating…"):
-                    payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
-                    r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-                    if r.status_code != 200:
-                        st.error(f"Backend error {r.status_code}")
-                        try:
-                            st.write(r.json())
-                        except Exception:
-                            st.write(r.text)
-                    else:
-                        data = r.json()
-                        st.session_state["tailored"] = {
-                            "tailored_resume_md": data.get("tailored_resume_md", ""),
-                            "cover_letter_md": data.get("cover_letter_md", ""),
-                        }
-                        st.session_state["insights"] = data.get("insights", {})
-                        st.success("Tailoring complete.")
-            except Exception as e:
-                st.exception(e)
 
-# Helpers
+# CTA (separate so it doesn’t visually attach to step 2)
+if st.button("Update résumé + cover letter", key="cta"):
+    resume_txt = (st.session_state.get("pasted_resume") or "").strip()
+    job_txt = (st.session_state.get("pasted_job") or "").strip()
+    if not resume_txt or not job_txt:
+        st.warning(
+            f"Paste your résumé and the job description first.\n"
+            f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
+        )
+    else:
+        try:
+            with st.spinner("Updating…"):
+                payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
+                r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
+                if r.status_code != 200:
+                    st.error(f"Backend error {r.status_code}")
+                    try:
+                        st.write(r.json())
+                    except Exception:
+                        st.write(r.text)
+                else:
+                    data = r.json()
+                    st.session_state["tailored"] = {
+                        "tailored_resume_md": data.get("tailored_resume_md", ""),
+                        "cover_letter_md": data.get("cover_letter_md", ""),
+                    }
+                    st.session_state["insights"] = data.get("insights", {})
+                    st.success("Tailoring complete.")
+        except Exception as e:
+            st.exception(e)
+
+# ---------- Helpers ----------
 def split_what_changed(md: str):
     if not md:
         return "", None
@@ -290,7 +345,7 @@ def split_summary(md: str):
     rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
     return summary_md, rest_md
 
-# ---------- Results (only render card if we have content) ----------
+# ---------- Results (render only if present) ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -304,31 +359,30 @@ if tailored:
     cover_md = tailored.get("cover_letter_md", "")
 
     with st.container(border=True):
-        # Dynamic tabs
         tab_labels = ["Résumé", "Cover Letter", "Downloads"]
         if changes_md:
             tab_labels.append("What changed")
         tab_labels += ["Insights", "Be a better candidate"]
         tabs = st.tabs(tab_labels)
 
-        # Résumé tab
+        # Résumé
         with tabs[0]:
             if summary_md:
                 st.subheader("Summary")
                 st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
                 st.divider()
-            st.subheader("Tailored résumé (preview)")
+            st.subheader("Résumé")
             st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
-        # Cover Letter tab
+        # Cover letter
         with tabs[1]:
-            st.subheader("Cover letter (preview)")
+            st.subheader("Cover letter")
             st.markdown(cover_md, unsafe_allow_html=False)
 
-        # Downloads tab
+        # Downloads
         with tabs[2]:
-            st.subheader("Downloads (.docx)")
-            resume_md = resume_md_full  # backend cleans for export
+            st.subheader("Downloads")
+            resume_md = resume_md_full  # backend export cleans formatting
 
             sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
             if st.session_state.get("docx_sig") != sig:
@@ -374,7 +428,7 @@ if tailored:
                     key="dl_cover",
                 )
 
-        # What changed tab (optional)
+        # What changed (optional)
         idx = 3
         if changes_md:
             with tabs[idx]:
@@ -382,14 +436,13 @@ if tailored:
                 st.markdown(changes_md, unsafe_allow_html=False)
             idx += 1
 
-        # Insights tab
+        # Insights
         with tabs[idx]:
             try:
                 if isinstance(insights, str):
                     insights = json.loads(insights)
             except Exception:
                 insights = {}
-
             score = int((insights or {}).get("match_score") or 0)
             missing = list((insights or {}).get("missing_keywords") or [])
             flags = list((insights or {}).get("ats_flags") or [])
@@ -410,7 +463,7 @@ if tailored:
             else:
                 st.info("Passed automated parsing checks (ATS).")
 
-        # Be a better candidate tab
+        # Be a better candidate
         with tabs[idx + 1]:
             try:
                 if isinstance(insights, str):
