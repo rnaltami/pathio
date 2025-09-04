@@ -169,7 +169,7 @@ st.markdown(
       div[role="region"][aria-label][tabindex="-1"] {
         padding: 14px 16px !important;
         background: var(--white) !important;
-        border: 0px solid var(--border) !important;
+        border: 1px solid var(--border) !important;
         border-radius: 14px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.02);
         overflow: hidden; /* prevents inner background peeking at rounded corners */
@@ -198,7 +198,7 @@ st.markdown(
         display:inline-flex; align-items:center; justify-content:center;
         width:24px; height:24px; border-radius:999px;
         background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px;
-        border: 1px solid var(--border);
+        border: 0px solid var(--border);
       }
       .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
       .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
@@ -216,7 +216,7 @@ st.markdown(
       <div class="tagline" style="line-height:1.5; font-weight:400;">
         ✔ Tailor your résumé<br>
         ✔ Generate a cover letter<br>
-        ✔ Get clear next steps to be a stronger candidate
+        ✔ Get steps to be a stronger candidate
       </div>
     </div>
     """,
