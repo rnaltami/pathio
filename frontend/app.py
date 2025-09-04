@@ -197,6 +197,9 @@ st.markdown(
       }
       .stButton button:hover{ filter: brightness(0.97); }
 
+      button[role="tab"]::after { display:none !important; }
+
+
       /* Step badges */
       .step-row { display:flex; align-items:center; gap:.5rem; margin: 8px 2px 8px 2px; }
       .step-badge {
