@@ -1,4 +1,4 @@
-# app.py — step badges layout, blue palette, tagline restored, CTA refined
+# app.py — step badges layout, refined borders, lighter tagline, CTA = "Go"
 import os
 import json
 import html
@@ -119,10 +119,11 @@ st.markdown(
       :root{
         --blue-600:#1e40af;   /* dark blue */
         --blue-500:#2563eb;   /* accent blue for focus/underline */
-        --blue-100:#eaf1ff;   /* light blue tint */
+        --blue-100:#eef4ff;   /* very light blue tint */
         --ink-900:#0f172a;    /* text */
+        --ink-700:#334155;    /* tagline subtle */
         --ink-600:#475569;    /* secondary text */
-        --border:#dbe7ff;     /* light blue border */
+        --border:#e6edf7;     /* softened border */
         --white:#ffffff;
       }
 
@@ -134,11 +135,11 @@ st.markdown(
         color: var(--ink-900);
       }
 
-      /* Logo word: slightly bigger, slightly lighter weight */
+      /* Logo word */
       .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
 
-      /* Tagline */
-      .tagline { font-size:20px; font-weight:700; margin:.35rem 0 .6rem 0; }
+      /* Tagline (lighter weight) */
+      .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1.0rem 0; }
 
       /* Headings */
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
@@ -149,7 +150,7 @@ st.markdown(
       .label { font-size:13px; color:var(--ink-600); }
       .para { font-size:14px; }
 
-      /* Inputs: white background, light blue border, gentle radius */
+      /* Inputs: match card background to avoid corner halos; gentle border */
       textarea, .stTextInput input {
         font-size:13px !important;
         background: var(--white) !important;
@@ -162,13 +163,16 @@ st.markdown(
         font-size:15px !important;
       }
 
-      /* Streamlit bordered containers = cards */
-      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf {
+      /* Streamlit bordered containers = cards (force same bg + clip corners) */
+      /* NOTE: the hashed classes vary; we include multiple selectors to be robust */
+      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf,
+      div[role="region"][aria-label][tabindex="-1"] {
         padding: 14px 16px !important;
         background: var(--white) !important;
         border: 1px solid var(--border) !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 6px 24px rgba(0,0,0,.03);
         border-radius: 14px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.02);
+        overflow: hidden; /* prevents inner background peeking at rounded corners */
       }
 
       /* Tabs: single blue underline */
@@ -204,12 +208,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- Header (logo + tagline) ----------
+# ---------- Header (logo + lighter tagline) ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
-      <div class="tagline">Be a better candidate.</div>
+      <div class="tagline">
+        Tailor your résumé to the job you want + generate a cover letter and get immediate steps
+        to becoming a better candidate for the job.
+      </div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -221,7 +228,7 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (two step cards, no overlay) ----------
+# ---------- Inputs (two step cards) ----------
 # STEP 1 — JOB
 with st.container(border=True):
     st.markdown(
@@ -254,8 +261,8 @@ with st.container(border=True):
         label_visibility="collapsed",
     )
 
-# CTA (kept separate so it doesn’t visually attach to step 2)
-cta_label = "Update résumé + create cover letter + insights"
+# CTA (separate so it doesn’t visually attach to step 2)
+cta_label = "Go"
 if st.button(cta_label, key="cta"):
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
@@ -331,9 +338,6 @@ def split_summary(md: str):
 # ---------- Results (render only if present) ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
-
-if not tailored:
-    st.caption("＋ insights and clear steps to improve your match for the role.")
 
 if tailored:
     resume_md_full = tailored.get("tailored_resume_md", "")
