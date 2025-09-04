@@ -227,7 +227,7 @@ st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
 # ---------- Inputs (step cards; Job uses overlay placeholder if enabled) ----------
-# STEP 1 — JOB
+# STEP 1 — JOB (pure step card, no overlay)
 with st.container(border=True):
     st.markdown(
         "<div class='step-row'><div class='step-badge'>1</div>"
@@ -235,15 +235,14 @@ with st.container(border=True):
         "<div class='step-hint'>Paste job description.</div></div>",
         unsafe_allow_html=True,
     )
-
-    st.markdown("<div class='overlay-wrap'>", unsafe_allow_html=True)
     job_text = st.text_area(
         "Job description input",
         key="pasted_job",
         height=140,
-        placeholder="",  # leave native placeholder empty so overlay carries the message
+        placeholder="Paste job description.",
         label_visibility="collapsed",
     )
+
     if OVERLAY_JOB and not (job_text or "").strip():
         st.markdown(
             """
