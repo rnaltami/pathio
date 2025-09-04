@@ -1,4 +1,4 @@
-# app.py — step badges layout, refined borders, lighter tagline, CTA = "Go"
+# app.py — uniform typography, blue-only tabs, blue update banner, no card borders
 import os
 import json
 import html
@@ -13,7 +13,6 @@ from urllib.parse import quote, unquote
 # =========================
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
-#-----st.caption(f"Using backend: {backend_url}")----
 
 # =====================================================
 # ALT VIEWS
@@ -139,18 +138,17 @@ st.markdown(
       .brand { font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
 
       /* Tagline (lighter weight) */
-      .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1.0rem 0; }
+      .tagline { font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1.0rem 0; line-height:1.5; }
 
-      /* Headings */
+      /* Uniform markdown typography:
+         - body (p, li) 13px equals inputs
+         - headings 16px equals tagline size (bold) */
+      .stMarkdown p, .stMarkdown li { font-size:13px !important; }
       .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        font-size:18px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
+        font-size:16px !important; font-weight:700 !important; margin:12px 0 8px 0 !important;
       }
 
-      /* Labels / small text */
-      .label { font-size:13px; color:var(--ink-600); }
-      .para { font-size:14px; }
-
-      /* Inputs: match card background to avoid corner halos; gentle border */
+      /* Inputs */
       textarea, .stTextInput input {
         font-size:13px !important;
         background: var(--white) !important;
@@ -163,27 +161,43 @@ st.markdown(
         font-size:15px !important;
       }
 
-      /* Streamlit bordered containers = cards (force same bg + clip corners) */
-      /* NOTE: the hashed classes vary; we include multiple selectors to be robust */
+      /* REMOVE card borders entirely (no card chrome around inputs / results) */
       .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf,
       div[role="region"][aria-label][tabindex="-1"] {
-        padding: 14px 16px !important;
-        background: var(--white) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 14px !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.02);
-        overflow: hidden; /* prevents inner background peeking at rounded corners */
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
       }
 
-      /* Tabs: single blue underline */
-      div[role="tablist"]{ border-bottom: 1px solid var(--border); margin-bottom: 10px; }
-      button[role="tab"]{ color: var(--ink-600) !important; }
+      /* Tabs: force blue-only underline, remove any red/box-shadow */
+      div[role="tablist"]{ border-bottom: 1px solid var(--border) !important; margin-bottom: 10px !important; }
+      button[role="tab"]{
+        color: var(--ink-600) !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border: 0 !important;
+        background: transparent !important;
+      }
       button[role="tab"][aria-selected="true"]{
         color: var(--ink-900) !important;
-        border-bottom: 2px solid var(--blue-500) !important;
-        font-weight: 700 !important;
         box-shadow: none !important;
+        outline: none !important;
+        border-bottom: 2px solid var(--blue-500) !important;
       }
+
+      /* Replace Streamlit alert greens with our palette by neutralizing stAlert styles */
+      .stAlert {
+        background: var(--blue-100) !important;
+        color: var(--ink-900) !important;
+        border: 0 !important;
+        border-radius: 10px !important;
+      }
+      .stAlert div { font-size:13px !important; }
+
+      /* Custom blue banner */
       .update-banner {
         background: var(--blue-100);
         color: var(--blue-600);
@@ -192,9 +206,9 @@ st.markdown(
         border-radius: 10px;
         margin-top: 10px;
         text-align: center;
-       }
+      }
 
-      /* CTA button: dark blue solid, white text */
+      /* CTA button */
       .stButton button{
         font-size:16px !important; font-weight:700 !important;
         border-radius: 12px !important; padding: 10px 16px !important;
@@ -203,12 +217,12 @@ st.markdown(
       .stButton button:hover{ filter: brightness(0.97); }
 
       /* Step badges */
-      .step-row { display:flex; align-items:center; gap:.5rem; margin: 2px 2px 8px 2px; }
+      .step-row { display:flex; align-items:center; gap:.5rem; margin: 8px 2px 8px 2px; }
       .step-badge {
         display:inline-flex; align-items:center; justify-content:center;
         width:24px; height:24px; border-radius:999px;
         background: var(--blue-100); color: var(--blue-600); font-weight:700; font-size:12px;
-        border: 0px solid var(--border);
+        border: 0;
       }
       .step-title { font-weight:700; font-size:14px; color: var(--ink-900); }
       .step-hint  { font-weight:500; font-size:13px; color: var(--ink-600); margin-left:.35rem; }
@@ -218,12 +232,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- Header (logo + lighter tagline) ----------
+# ---------- Header (logo + heavy-check tagline) ----------
 st.markdown(
     """
     <div style="text-align:center; margin-bottom:.6rem;">
       <div class="brand">PATHIO</div>
-      <div class="tagline" style="line-height:1.5; font-weight:400;">
+      <div class="tagline">
         ✔ Tailor your résumé<br>
         ✔ Generate a cover letter<br>
         ✔ Get steps to be a stronger candidate
@@ -239,44 +253,42 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# ---------- Inputs (two step cards) ----------
+# ---------- Inputs (flat layout: no outer card borders) ----------
 # STEP 1 — JOB
-with st.container(border=True):
-    st.markdown(
-        "<div class='step-row'><div class='step-badge'>1</div>"
-        "<div class='step-title'>Start with the job you want</div>"
-        "<div class='step-hint'>Paste job description.</div></div>",
-        unsafe_allow_html=True,
-    )
-    job_text = st.text_area(
-        "Job description input",
-        key="pasted_job",
-        height=140,
-       # placeholder="Paste job description.",
-        label_visibility="collapsed",
-    )
+st.markdown(
+    "<div class='step-row'><div class='step-badge'>1</div>"
+    "<div class='step-title'>Start with the job you want</div>"
+    "<div class='step-hint'>Paste job description.</div></div>",
+    unsafe_allow_html=True,
+)
+job_text = st.text_area(
+    "Job description input",
+    key="pasted_job",
+    height=140,
+    # placeholder="Paste job description.",  # optional
+    label_visibility="collapsed",
+)
 
 # STEP 2 — RÉSUMÉ
-with st.container(border=True):
-    st.markdown(
-        "<div class='step-row'><div class='step-badge'>2</div>"
-        "<div class='step-title'>Then paste your résumé</div>",
-        unsafe_allow_html=True,
-    )
-    resume_text = st.text_area(
-        "Résumé input",
-        key="pasted_resume",
-        height=160,
-        # placeholder="Paste résumé.",
-        label_visibility="collapsed",
-    )
+st.markdown(
+    "<div class='step-row'><div class='step-badge'>2</div>"
+    "<div class='step-title'>Then paste your résumé</div></div>",
+    unsafe_allow_html=True,
+)
+resume_text = st.text_area(
+    "Résumé input",
+    key="pasted_resume",
+    height=160,
+    # placeholder="Paste résumé.",
+    label_visibility="collapsed",
+)
 
-# CTA (separate so it doesn’t visually attach to step 2)
-cta_label = "Go"
-if st.button(cta_label, key="cta"):
+# CTA
+if st.button("Go", key="cta"):
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
     if not resume_txt or not job_txt:
+        # Keep Streamlit warning for logic, but it's styled to blue via .stAlert override
         st.warning(
             f"Paste your résumé and the job description first.\n"
             f"(résumé chars: {len(resume_txt)}, job chars: {len(job_txt)})"
@@ -286,23 +298,15 @@ if st.button(cta_label, key="cta"):
             with st.spinner("Updating…"):
                 payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
                 r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-                if r.status_code != 200:
-                    st.error(f"Backend error {r.status_code}")
-                    try:
-                        st.write(r.json())
-                    except Exception:
-                        st.write(r.text)
-                else:
-                    data = r.json()
-                    st.session_state["tailored"] = {
-                        "tailored_resume_md": data.get("tailored_resume_md", ""),
-                        "cover_letter_md": data.get("cover_letter_md", ""),
-                    }
-                    st.session_state["insights"] = data.get("insights", {})
-                    st.markdown(
-    "<div class='update-banner'>Updating complete.</div>",
-    unsafe_allow_html=True,
-)
+                r.raise_for_status()
+                data = r.json()
+                st.session_state["tailored"] = {
+                    "tailored_resume_md": data.get("tailored_resume_md", ""),
+                    "cover_letter_md": data.get("cover_letter_md", ""),
+                }
+                st.session_state["insights"] = data.get("insights", {})
+            # Blue banner (no green)
+            st.markdown("<div class='update-banner'>Updating complete.</div>", unsafe_allow_html=True)
         except Exception as e:
             st.exception(e)
 
@@ -348,7 +352,7 @@ def split_summary(md: str):
     rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
     return summary_md, rest_md
 
-# ---------- Results (render only if present) ----------
+# ---------- Results ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -358,132 +362,133 @@ if tailored:
     summary_md, body_md = split_summary(main_md)
     cover_md = tailored.get("cover_letter_md", "")
 
-    with st.container(border=True):
-        tab_labels = ["Résumé", "Cover Letter", "Downloads"]
-        if changes_md:
-            tab_labels.append("What changed")
-        tab_labels += ["Insights", "Be a better candidate"]
-        tabs = st.tabs(tab_labels)
+    # Flat tabs (no card border)
+    tab_labels = ["Résumé", "Cover Letter", "Downloads"]
+    if changes_md:
+        tab_labels.append("What changed")
+    tab_labels += ["Insights", "Be a better candidate"]
+    tabs = st.tabs(tab_labels)
 
-        # Résumé
-        with tabs[0]:
-            if summary_md:
-                st.subheader("Summary")
-                st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
-                st.divider()
-            st.subheader("Updated Résumé")
-            st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
+    # Résumé
+    with tabs[0]:
+        if summary_md:
+            st.subheader("Summary")
+            st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
+            st.divider()
+        st.subheader("Updated Résumé")
+        st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
-        # Cover letter
-        with tabs[1]:
-            st.subheader("Cover letter")
-            st.markdown(cover_md, unsafe_allow_html=False)
+    # Cover letter
+    with tabs[1]:
+        st.subheader("Cover letter")
+        st.markdown(cover_md, unsafe_allow_html=False)
 
-        # Downloads
-        with tabs[2]:
-            st.subheader("Downloads")
-            resume_md = resume_md_full  # backend export cleans formatting
+    # Downloads
+    with tabs[2]:
+        st.subheader("Downloads")
+        resume_md = resume_md_full
+        sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
+        if st.session_state.get("docx_sig") != sig:
+            st.session_state["docx_sig"] = sig
+            st.session_state["resume_docx"] = None
+            st.session_state["cover_docx"] = None
 
-            sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
-            if st.session_state.get("docx_sig") != sig:
-                st.session_state["docx_sig"] = sig
-                st.session_state["resume_docx"] = None
-                st.session_state["cover_docx"] = None
+        if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
+            with st.spinner("Preparing downloads…"):
+                try:
+                    for which in ("resume", "cover"):
+                        payload = {
+                            "tailored_resume_md": resume_md,
+                            "cover_letter_md": cover_md,
+                            "which": which,
+                        }
+                        rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+                        rr.raise_for_status()
+                        if which == "resume":
+                            st.session_state["resume_docx"] = rr.content
+                        else:
+                            st.session_state["cover_docx"] = rr.content
+                except Exception as e:
+                    st.error(f"Export failed: {e}")
 
-            if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
-                with st.spinner("Preparing downloads…"):
-                    try:
-                        for which in ("resume", "cover"):
-                            payload = {
-                                "tailored_resume_md": resume_md,
-                                "cover_letter_md": cover_md,
-                                "which": which,
-                            }
-                            rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
-                            rr.raise_for_status()
-                            if which == "resume":
-                                st.session_state["resume_docx"] = rr.content
-                            else:
-                                st.session_state["cover_docx"] = rr.content
-                    except Exception as e:
-                        st.error(f"Export failed: {e}")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Download résumé",
+                data=st.session_state.get("resume_docx") or b"",
+                file_name="pathio_resume.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                disabled=st.session_state.get("resume_docx") is None,
+                key="dl_resume",
+            )
+        with c2:
+            st.download_button(
+                "Download cover letter",
+                data=st.session_state.get("cover_docx") or b"",
+                file_name="pathio_cover_letter.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                disabled=st.session_state.get("cover_docx") is None,
+                key="dl_cover",
+            )
 
-            c1, c2 = st.columns(2)
-            with c1:
-                st.download_button(
-                    "Download résumé",
-                    data=st.session_state.get("resume_docx") or b"",
-                    file_name="pathio_resume.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    disabled=st.session_state.get("resume_docx") is None,
-                    key="dl_resume",
-                )
-            with c2:
-                st.download_button(
-                    "Download cover letter",
-                    data=st.session_state.get("cover_docx") or b"",
-                    file_name="pathio_cover_letter.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    disabled=st.session_state.get("cover_docx") is None,
-                    key="dl_cover",
-                )
-
-        # What changed (optional)
-        idx = 3
-        if changes_md:
-            with tabs[idx]:
-                st.subheader("What changed")
-                st.markdown(changes_md, unsafe_allow_html=False)
-            idx += 1
-
-        # Insights
+    # What changed (optional)
+    idx = 3
+    if changes_md:
         with tabs[idx]:
-            try:
-                if isinstance(insights, str):
-                    insights = json.loads(insights)
-            except Exception:
-                insights = {}
-            score = int((insights or {}).get("match_score") or 0)
-            missing = list((insights or {}).get("missing_keywords") or [])
-            flags = list((insights or {}).get("ats_flags") or [])
+            st.subheader("What changed")
+            st.markdown(changes_md, unsafe_allow_html=False)
+        idx += 1
 
-            st.subheader("Match")
-            st.write(f"**Match score:** {score}%")
-            st.progress(max(0, min(score, 100)) / 100.0)
+    # Insights
+    with tabs[idx]:
+        try:
+            if isinstance(insights, str):
+                insights = json.loads(insights)
+        except Exception:
+            insights = {}
+        score = int((insights or {}).get("match_score") or 0)
+        missing = list((insights or {}).get("missing_keywords") or [])
+        flags = list((insights or {}).get("ats_flags") or [])
 
-            st.subheader("Keywords & checks")
-            if missing:
-                st.warning("Missing keywords")
-                st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
-            else:
-                st.success("No critical keywords missing")
-            if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
-                st.warning("ATS checks")
-                st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
-            else:
-                st.info("Passed automated parsing checks (ATS).")
+        st.subheader("Match")
+        st.write(f"**Match score:** {score}%")
+        st.progress(max(0, min(score, 100)) / 100.0)
 
-        # Be a better candidate
-        with tabs[idx + 1]:
-            try:
-                if isinstance(insights, str):
-                    insights = json.loads(insights)
-            except Exception:
-                insights = {}
-            do_now = list((insights or {}).get("do_now") or [])
-            do_long = list((insights or {}).get("do_long") or [])
+        st.subheader("Keywords & checks")
+        if missing:
+            # Use neutral list, not green success box
+            st.markdown("**Missing keywords**")
+            st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
+        else:
+            st.markdown("**No critical keywords missing**")
 
-            st.subheader("Be a better candidate")
-            if not (do_now or do_long):
-                st.info("No action suggestions available yet.")
-            else:
-                if do_now:
-                    st.write("**Do these now**")
-                    for text in do_now:
-                        href = f"?view=chat&prompt={quote(str(text))}"
-                        st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
-                if do_long:
-                    st.write("**Do these long term**")
-                    for text in do_long:
-                        href = f"?view=chat&prompt={quote(str(text))}"
-                        st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
+        if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
+            st.markdown("**ATS checks**")
+            st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
+        else:
+            st.markdown("**Passed automated parsing checks (ATS).**")
+
+    # Be a better candidate
+    with tabs[idx + 1]:
+        try:
+            if isinstance(insights, str):
+                insights = json.loads(insights)
+        except Exception:
+            insights = {}
+        do_now = list((insights or {}).get("do_now") or [])
+        do_long = list((insights or {}).get("do_long") or [])
+
+        st.subheader("Be a better candidate")
+        if not (do_now or do_long):
+            st.markdown("_No action suggestions available yet._")
+        else:
+            if do_now:
+                st.markdown("**Do these now**")
+                for text in do_now:
+                    href = f"?view=chat&prompt={quote(str(text))}"
+                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
+            if do_long:
+                st.markdown("**Do these long term**")
+                for text in do_long:
+                    href = f"?view=chat&prompt={quote(str(text))}"
+                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
