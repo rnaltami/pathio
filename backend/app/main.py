@@ -54,9 +54,12 @@ def _normalize(s: str) -> str:
 def _is_header_line(line: str, name: str) -> bool:
     """True if line looks like a header with 'name' (case-insensitive), ignoring *, _, # wrappers."""
     raw = _normalize(line)
-    raw = re.sub(r"^[#*\s_>-\.:]+", "", raw)
-    raw = re.sub(r"[*_#\s]+$", "", raw)
+    # remove leading header/formatting marks (escape hyphen!)
+    raw = re.sub(r"^[#*\s_>\-\.:\|]+", "", raw)
+    # remove trailing formatting/space
+    raw = re.sub(r"[#*\s_\-\.:\|]+$", "", raw)
     return raw.lower() == name.lower()
+
 
 def _remove_summary_block(md: str) -> str:
     """Remove a 'Summary' header + its immediate paragraph/bullets."""
