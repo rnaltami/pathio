@@ -68,10 +68,8 @@ def _remove_summary_block(md: str) -> str:
     while i < len(lines):
         if _is_header_line(lines[i], "summary"):
             i += 1
-            # skip blank lines
             while i < len(lines) and not lines[i].strip():
                 i += 1
-            # consume bullets/paragraph until blank OR next clear header-like line
             while i < len(lines):
                 ln = lines[i]
                 if not ln.strip():
@@ -103,19 +101,15 @@ def _strip_markdown_inline(text: str) -> str:
     if not text:
         return ""
     s = text
-    # links: [text](url) -> text (url)
-    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", s)
-    # balanced emphasis/code
-    s = re.sub(r"\*\*(.*?)\*\*", r"\1", s)
-    s = re.sub(r"__(.*?)__", r"\1", s)
-    s = re.sub(r"\*(.*?)\*", r"\1", s)
-    s = re.sub(r"_(.*?)_", r"\1", s)
-    s = re.sub(r"`([^`]+)`", r"\1", s)
-    # unbalanced cleanup
-    s = re.sub(r"(^|\s)[*_]{1,3}(\S)", r"\1\2", s)  # leading
-    s = re.sub(r"(\S)[*_]{1,3}(\s|$)", r"\1\2", s)  # trailing
-    # collapse spaces
-    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", s)  # links
+    s = re.sub(r"\*\*(.*?)\*\*", r"\1", s)                 # bold
+    s = re.sub(r"__(.*?)__", r"\1", s)                     # bold (alt)
+    s = re.sub(r"\*(.*?)\*", r"\1", s)                     # italics
+    s = re.sub(r"_(.*?)_", r"\1", s)                       # italics (alt)
+    s = re.sub(r"`([^`]+)`", r"\1", s)                     # inline code
+    s = re.sub(r"(^|\s)[*_]{1,3}(\S)", r"\1\2", s)         # leading loose *
+    s = re.sub(r"(\S)[*_]{1,3}(\s|$)", r"\1\2", s)         # trailing loose *
+    s = re.sub(r"[ \t]+", " ", s)                          # collapse spaces
     return s.strip()
 
 def _preprocess_for_resume(md: str) -> str:
@@ -140,7 +134,7 @@ def _preprocess_for_cover(md: str) -> str:
 @export_router.post("/export")
 def export_doc(req: ExportRequest):
     import logging, traceback, io
-    logger = logging.getLogger("uvicorn.error")  # Render surfaces this
+    logger = logging.getLogger("uvicorn.error")
 
     try:
         if req.which == "resume":
@@ -159,9 +153,9 @@ def export_doc(req: ExportRequest):
                 status_code=400,
             )
 
-        # Try DOCX; fallback to TXT if python-docx missing
+        # Try DOCX; fallback to TXT (never label as .docx)
         try:
-            from docx import Document  # python-docx
+            from docx import Document
         except Exception:
             return Response(
                 content=content.encode("utf-8"),
@@ -171,6 +165,7 @@ def export_doc(req: ExportRequest):
                     "X-Exporter": "clean",
                     "X-Exporter-Fallback": "no-docx",
                 },
+                status_code=200,
             )
 
         doc = Document()
@@ -179,7 +174,6 @@ def export_doc(req: ExportRequest):
         for raw in content.splitlines():
             line = raw.rstrip("\n")
 
-            # simple heading heuristics
             if re.match(r"^[A-Z0-9 ,/&()'’.-]{6,}$", line) and line.strip() == line.upper():
                 doc.add_heading(line.strip(), level=2)
                 continue
@@ -212,13 +206,13 @@ def export_doc(req: ExportRequest):
                 "Content-Disposition": 'attachment; filename="pathio_export.docx"',
                 "X-Exporter": "clean",
             },
+            status_code=200,
         )
 
     except Exception as e:
-        # Log full traceback to Render logs AND return a readable text file to the browser
         logger.exception("EXPORT_FAILED")
-        tb = traceback.format_exc()
-        debug_text = f"EXPORT_ERROR: {e}\n\nTRACEBACK:\n{tb}\n"
+        import traceback as _tb
+        debug_text = f"EXPORT_ERROR: {e}\n\nTRACEBACK:\n{_tb.format_exc()}\n"
         return Response(
             content=debug_text.encode("utf-8"),
             media_type="text/plain; charset=utf-8",
@@ -227,7 +221,7 @@ def export_doc(req: ExportRequest):
                 "X-Exporter": "clean",
                 "X-Exporter-Error": type(e).__name__,
             },
-            status_code=200,  # so the frontend download succeeds for inspection
+            status_code=500,
         )
 
 # Register the CLEAN export router FIRST so it takes precedence
