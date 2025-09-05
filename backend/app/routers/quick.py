@@ -164,10 +164,15 @@ def call_llm_tailor(resume_text: str, job_text: str) -> Tuple[str, str]:
         f"JOB DESCRIPTION:\n{job_text}\n\n"
         f"RESUME (verbatim source):\n{resume_text}\n\n"
         "TASKS:\n"
-        "1) Rewrite the resume aligned to the job WITHOUT adding new tools/skills/metrics not in the source.\n"
-        "2) Draft a short cover letter (≤180 words) that stays factual to the resume.\n"
-        "Return as exactly two sections labeled:\n"
-        "===TAILORED_RESUME===\n...\n===COVER_LETTER===\n...\n"
+        "Return exactly two sections:\n"
+        "===TAILORED_RESUME===\n"
+        "**Summary**\n"
+        "- One short sentence (max 28 words) that only uses facts present in the source resume.\n"
+        "- If you cannot truthfully summarize, write a single dash '-' on the next line.\n"
+        "\n"
+        "Then the updated résumé content (Markdown, ATS-friendly). Do not invent tools, metrics, employers, or dates.\n"
+        "===COVER_LETTER===\n"
+        "A short, factual cover letter (≤180 words) grounded only in the source resume.\n"
     )
     raw = _chat(
         [{"role":"system","content":system},{"role":"user","content":user_resume}],
