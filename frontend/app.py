@@ -1,5 +1,4 @@
-# app.py — no persistent hints, enabled CTA w/ click-validate, no success toast,
-# show Summary in tab (but not in downloadable resume), pill tabs styling
+# app.py — stable form submit, summary above resume, no always-on hints, prefetch downloads
 
 import os
 import json
@@ -30,8 +29,7 @@ if qp.get("view") == "chat":
     st.divider()
 
     st.session_state.setdefault("chat_messages", [])
-
-    def fallback_steps(prompt: str) -> str:
+    def fallback_steps(_: str) -> str:
         return ("**Starter steps:**\n"
                 "1) Break the task into 4–6 steps with outcomes.\n"
                 "2) Timebox step 1 to 20 minutes and start.\n"
@@ -127,27 +125,75 @@ st.session_state.setdefault("pasted_resume", "")
 st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
+st.session_state.setdefault("resume_docx", None)
+st.session_state.setdefault("cover_docx", None)
+st.session_state.setdefault("docx_sig", "")
 
-# Inputs
-st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
-job_text = st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
+# ---------- Helpers ----------
+def split_what_changed(md: str):
+    if not md: return "", None
+    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
+    if not m: return md, None
+    return md[:m.start()].rstrip(), md[m.start():].lstrip()
 
-st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
-resume_text = st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
+def split_summary(md: str):
+    """Return (summary_md, rest_md). Summary block = '**Summary**' + following bullets/paragraph until break."""
+    if not md: return None, md
+    lines = md.splitlines(); start = None
+    for i, line in enumerate(lines):
+        if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
+            start = i; break
+    if start is None: return None, md
+    end = start + 1; saw_bullet = False
+    while end < len(lines):
+        s = lines[end].strip()
+        if s == "": end += 1; continue
+        if s.startswith(("-", "•", "*")): saw_bullet = True; end += 1; continue
+        if saw_bullet: break
+        break
+    summary_md = "\n".join(lines[start:end]).strip()
+    if summary_md.lower().strip() == "**summary**": return None, md
+    rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
+    return summary_md, rest_md
 
-# CTA always enabled; validate on click only
-if st.button("Go", key="cta"):
-    resume_txt = (st.session_state.get("pasted_resume") or "").strip()
-    job_txt = (st.session_state.get("pasted_job") or "").strip()
-    if not resume_txt or not job_txt:
+def _fetch_doc(which: str, resume_md: str, cover_md: str):
+    payload = {"tailored_resume_md": resume_md, "cover_letter_md": cover_md, "which": which}
+    rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
+    ctype = (rr.headers.get("Content-Type") or rr.headers.get("content-type") or "").lower()
+    x_err = rr.headers.get("X-Exporter-Error")
+    if "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in ctype and not x_err:
+        return rr.content, None
+    try:
+        return None, rr.text
+    except Exception:
+        return None, f"Export failed with status {rr.status_code}."
+
+# ---------- Inputs inside a form (prevents multi-click weirdness) ----------
+with st.form(key="inputs"):
+    st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
+    job_text = st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
+
+    st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
+    resume_text = st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
+
+    submit = st.form_submit_button("Go")
+
+# ---- Handle submit ----
+if submit:
+    have_job = bool((st.session_state.get("pasted_job") or "").strip())
+    have_resume = bool((st.session_state.get("pasted_resume") or "").strip())
+    if not (have_job and have_resume):
         st.toast("Please paste both the job description and your résumé.", icon="⚠️")
     else:
         try:
             with st.spinner("Updating…"):
-                payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
+                payload = {
+                    "resume_text": (st.session_state.get("pasted_resume") or "").strip(),
+                    "job_text": (st.session_state.get("pasted_job") or "").strip(),
+                    "user_tweaks": {},
+                }
                 r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
                 if r.status_code == 503:
-                    # Friendly strict-mode backend message, no banners
                     try:
                         msg = r.json().get("error") or "Service temporarily unavailable."
                     except Exception:
@@ -161,54 +207,25 @@ if st.button("Go", key="cta"):
                         "cover_letter_md": data.get("cover_letter_md", ""),
                     }
                     st.session_state["insights"] = data.get("insights", {})
-                    # No success toast/banner; tabs appear below
+
+                    # Prefetch downloads once so the buttons work on first click
+                    resume_md_full = st.session_state["tailored"]["tailored_resume_md"]
+                    cover_md = st.session_state["tailored"]["cover_letter_md"]
+                    sig = hashlib.md5((resume_md_full + "||" + cover_md).encode("utf-8")).hexdigest()
+                    st.session_state["docx_sig"] = sig
+                    with st.spinner("Preparing downloads…"):
+                        res_bytes, res_err = _fetch_doc("resume", resume_md_full, cover_md)
+                        cov_bytes, cov_err = _fetch_doc("cover", resume_md_full, cover_md)
+                        st.session_state["resume_docx"] = None if res_err else res_bytes
+                        st.session_state["cover_docx"]  = None if cov_err else cov_bytes
+                        if res_err: st.toast(f"Resume export error: {res_err}", icon="⚠️")
+                        if cov_err: st.toast(f"Cover export error: {cov_err}", icon="⚠️")
         except requests.exceptions.HTTPError as e:
             st.toast(f"Update failed ({e.response.status_code}). Please try again.", icon="⚠️")
         except Exception as e:
             st.toast(f"Update failed. {e}", icon="⚠️")
 
-# -------- Helpers for Summary & What changed --------
-def split_what_changed(md: str):
-    if not md: return "", None
-    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
-    if not m: return md, None
-    return md[:m.start()].rstrip(), md[m.start():].lstrip()
-
-def split_summary(md: str):
-    """Find an explicit **Summary** block. If missing, try to derive a small intro paragraph from the top."""
-    if not md: return None, md
-    lines = md.splitlines()
-    # 1) explicit **Summary** header
-    for i, line in enumerate(lines):
-        if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
-            # collect paragraph/bullets under it
-            end = i + 1
-            saw_bullet = False
-            while end < len(lines):
-                s = lines[end].strip()
-                if s == "": end += 1; continue
-                if s.startswith(("-", "•", "*")): saw_bullet = True; end += 1; continue
-                if saw_bullet: break
-                break
-            summary_md = "\n".join(lines[i:end]).strip()
-            if summary_md.lower().strip() == "**summary**":
-                break  # empty summary header; fall through to fallback
-            rest_md = ("\n".join(lines[:i] + lines[end:])).strip()
-            return summary_md, rest_md
-    # 2) fallback: grab first non-empty, non-heading paragraph near the top
-    #    (for on-screen preview only; download stripping handled in backend)
-    blocks = [b.strip() for b in re.split(r"\n\s*\n", md) if b.strip()]
-    if blocks:
-        first = blocks[0]
-        # reject if it looks like a heading block (ALL CAPS or starts with **Heading**)
-        if not (first.isupper() or re.match(r"^\s*\*\*[^*]+\*\*\s*$", first)):
-            # treat this as a soft "summary" for display
-            rest = md[len(first):].lstrip()
-            fake = "**Summary**\n" + first
-            return fake, rest
-    return None, md
-
-# ---------------- Results ----------------
+# ---------- Results ----------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -223,62 +240,39 @@ if tailored:
     tab_labels += ["Insights", "Be a better candidate"]
     tabs = st.tabs(tab_labels)
 
-    # Updated résumé
+    # Updated résumé — summary first (no heading), then body (no divider)
     with tabs[0]:
         if summary_md:
+            # render summary *content only*, no "**Summary**"
             st.markdown(summary_md.replace("**Summary**", "").strip(), unsafe_allow_html=False)
-            st.divider()
+            st.markdown("")  # tiny breathing room
         st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
 
     # Cover letter
     with tabs[1]:
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads
+    # Downloads (already prefetched on success)
     with tabs[2]:
-        resume_md = resume_md_full  # backend export strips Summary/What changed
-        sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
-        if st.session_state.get("docx_sig") != sig:
-            st.session_state["docx_sig"] = sig
-            st.session_state["resume_docx"] = None
-            st.session_state["cover_docx"] = None
-
-        def _fetch_doc(which: str, resume_md: str, cover_md: str):
-            payload = {"tailored_resume_md": resume_md, "cover_letter_md": cover_md, "which": which}
-            rr = requests.post(f"{backend_url}/export", json=payload, timeout=60)
-            ctype = (rr.headers.get("Content-Type") or rr.headers.get("content-type") or "").lower()
-            x_err = rr.headers.get("X-Exporter-Error")
-            if "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in ctype and not x_err:
-                return rr.content, None
-            try:
-                return None, rr.text
-            except Exception:
-                return None, f"Export failed with status {rr.status_code}."
-
-        if st.session_state.get("resume_docx") is None or st.session_state.get("cover_docx") is None:
-            try:
-                res_bytes, res_err = _fetch_doc("resume", resume_md, cover_md)
-                cov_bytes, cov_err = _fetch_doc("cover", resume_md, cover_md)
-                if res_err: st.toast(f"Resume export error: {res_err}", icon="⚠️")
-                else: st.session_state["resume_docx"] = res_bytes
-                if cov_err: st.toast(f"Cover export error: {cov_err}", icon="⚠️")
-                else: st.session_state["cover_docx"] = cov_bytes
-            except Exception as e:
-                st.toast(f"Export failed: {e}", icon="⚠️")
-
         c1, c2 = st.columns(2)
         with c1:
-            st.download_button("Download résumé",
+            st.download_button(
+                "Download résumé",
                 data=st.session_state.get("resume_docx") or b"",
                 file_name="pathio_resume.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("resume_docx") is None, key="dl_resume")
+                disabled=st.session_state.get("resume_docx") is None,
+                key="dl_resume",
+            )
         with c2:
-            st.download_button("Download cover letter",
+            st.download_button(
+                "Download cover letter",
                 data=st.session_state.get("cover_docx") or b"",
                 file_name="pathio_cover_letter.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                disabled=st.session_state.get("cover_docx") is None, key="dl_cover")
+                disabled=st.session_state.get("cover_docx") is None,
+                key="dl_cover",
+            )
 
     # What changed (optional)
     idx = 3
