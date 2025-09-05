@@ -1,4 +1,4 @@
-# app.py — prefetch exports, show summary above resume, no validation captions/toasts, pill tabs
+# app.py — uses backend what_changed_md, prefetch exports, summary above resume, pill tabs
 
 import os
 import json
@@ -132,7 +132,7 @@ st.markdown(
       textarea,.stTextInput input{ font-size:13px!important; background:var(--white)!important; border:1px solid var(--border)!important; border-radius:12px!important; }
       textarea::placeholder,.stTextInput input::placeholder{ color:var(--ink-600)!important; opacity:.9!important; font-size:15px!important; }
 
-      /* Remove Streamlit card chrome around containers */
+      /* Remove Streamlit card chrome */
       .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf, div[role="region"][aria-label][tabindex="-1"]{
         padding:0!important; background:transparent!important; border:0!important;
         border-radius:0!important; box-shadow:none!important; overflow:visible!important;
@@ -201,16 +201,6 @@ st.session_state.setdefault("resume_export_error", None)
 st.session_state.setdefault("cover_export_error", None)
 
 # ---------- Helpers ----------
-def split_what_changed(md: str):
-    if not md:
-        return "", None
-    m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
-    if not m:
-        return md, None
-    main_md = md[:m.start()].rstrip()
-    changes_md = md[m.start():].lstrip()
-    return main_md, changes_md
-
 def split_summary(md: str):
     """Return (summary_md_without_header, rest_md) or (None, full_md)."""
     if not md:
@@ -238,18 +228,14 @@ def split_summary(md: str):
             break
         break
     summary_block = "\n".join(lines[start:end]).strip()
-    only_header = summary_block.lower().strip() == "**summary**"
-    if only_header:
+    if summary_block.lower().strip() == "**summary**":
         return None, md
     summary_no_header = summary_block.replace("**Summary**", "").strip()
     rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
     return summary_no_header, rest_md
 
 def prefetch_exports(resume_md: str, cover_md: str):
-    """
-    Fetch resume + cover DOCX concurrently and cache in session_state.
-    No-op if already cached for this content signature.
-    """
+    """Fetch resume + cover DOCX concurrently and cache in session_state."""
     sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
     if (
         st.session_state.get("docx_sig") == sig
@@ -326,7 +312,6 @@ if cta and both_present:
             }
             r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
             if r.status_code == 503:
-                # backend strict mode friendly message
                 try:
                     msg = r.json().get("error") or "Service temporarily unavailable."
                 except Exception:
@@ -338,6 +323,7 @@ if cta and both_present:
                 st.session_state["tailored"] = {
                     "tailored_resume_md": data.get("tailored_resume_md", ""),
                     "cover_letter_md": data.get("cover_letter_md", ""),
+                    "what_changed_md": data.get("what_changed_md", ""),  # NEW: from backend
                 }
                 st.session_state["insights"] = data.get("insights", {})
 
@@ -361,8 +347,11 @@ insights = st.session_state.get("insights")
 
 if tailored:
     resume_md_full = tailored.get("tailored_resume_md", "")
-    main_md, changes_md = split_what_changed(resume_md_full)
-    summary_md, body_md = split_summary(main_md)
+    # We no longer parse "what changed" from the resume. Use backend field directly.
+    changes_md = tailored.get("what_changed_md", "") or None
+
+    # Still allow Summary extraction (if the LLM included a **Summary** section)
+    summary_md, body_md = split_summary(resume_md_full)
     cover_md = tailored.get("cover_letter_md", "")
 
     tab_labels = ["Updated résumé", "Cover letter", "Downloads"]
@@ -374,15 +363,15 @@ if tailored:
     # Updated résumé (summary shown ABOVE the body)
     with tabs[0]:
         if summary_md:
-            st.markdown(summary_md)  # already stripped of the "**Summary**" header
-            st.markdown("")  # tiny spacer
-        st.markdown(body_md if body_md else main_md, unsafe_allow_html=False)
+            st.markdown(summary_md)   # summary (no "**Summary**" header)
+            st.markdown("")           # tiny spacer
+        st.markdown(body_md if body_md else resume_md_full, unsafe_allow_html=False)
 
     # Cover letter
     with tabs[1]:
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads (no network calls here; buttons are instant)
+    # Downloads (prefetched; no network calls now)
     with tabs[2]:
         resume_blob = st.session_state.get("resume_docx")
         cover_blob = st.session_state.get("cover_docx")
