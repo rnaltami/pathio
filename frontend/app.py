@@ -1,4 +1,6 @@
-# app.py — pill tabs, no validation captions, disabled CTA until filled, friendly 503 handling
+# app.py — no persistent hints, enabled CTA w/ click-validate, no success toast,
+# show Summary in tab (but not in downloadable resume), pill tabs styling
+
 import os
 import json
 import html
@@ -26,12 +28,15 @@ if qp.get("view") == "chat":
     st.markdown(f"<div class='chat-title'>{title}</div>", unsafe_allow_html=True)
     st.markdown("<div class='chat-subtle'>Practical, step-by-step instructions.</div>", unsafe_allow_html=True)
     st.divider()
+
     st.session_state.setdefault("chat_messages", [])
+
     def fallback_steps(prompt: str) -> str:
         return ("**Starter steps:**\n"
                 "1) Break the task into 4–6 steps with outcomes.\n"
                 "2) Timebox step 1 to 20 minutes and start.\n"
                 "3) Save evidence (doc/clip) and iterate once.\n")
+
     if seed and not st.session_state["chat_messages"]:
         st.session_state["chat_messages"].append({"role":"user","content":seed})
         try:
@@ -41,9 +46,11 @@ if qp.get("view") == "chat":
         except Exception:
             reply = fallback_steps(seed)
         st.session_state["chat_messages"].append({"role":"assistant","content":reply})
+
     for m in st.session_state["chat_messages"]:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
+
     user_msg = st.chat_input("Ask a follow-up…")
     if user_msg:
         st.session_state["chat_messages"].append({"role":"user","content":user_msg})
@@ -69,7 +76,7 @@ st.markdown("""
   --ink-900:#0f172a; --ink-700:#334155; --ink-600:#475569; --border:#e6edf7; --white:#ffffff;
 }
 .main .block-container{max-width:860px;padding-top:2rem;padding-bottom:2rem}
-.app *{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto, Oyxgen,Ubuntu,Cantarell,"Open Sans","Helvetica Neue",sans-serif!important;color:var(--ink-900)}
+.app *{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Open Sans","Helvetica Neue",sans-serif!important;color:var(--ink-900)}
 .brand{font-size:32px;font-weight:700;letter-spacing:.2px;margin:0}
 .tagline{font-size:16px;font-weight:400;color:var(--ink-700);margin:.4rem 0 1rem 0;line-height:1.5}
 .stMarkdown p,.stMarkdown li{font-size:13px!important}
@@ -99,9 +106,6 @@ button[role="tab"][aria-selected="true"]{background:var(--white)!important;color
 .step-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:var(--blue-100);color:var(--blue-600);font-weight:700;font-size:12px;border:0}
 .step-title{font-weight:700;font-size:14px;color:var(--ink-900)}
 .step-hint{font-weight:500;font-size:13px;color:var(--ink-600);margin-left:.35rem}
-
-/* Tiny hint under button */
-.hint{font-size:12px;color:var(--ink-600);margin-top:4px}
 </style>
 <div class="app"></div>
 """, unsafe_allow_html=True)
@@ -124,51 +128,46 @@ st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
 st.session_state.setdefault("insights", None)
 
-# Inputs (no captions)
+# Inputs
 st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
 job_text = st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
 
 st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
 resume_text = st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
 
-# CTA: disabled until both have content
-disabled = not ((st.session_state.get("pasted_job") or "").strip() and (st.session_state.get("pasted_resume") or "").strip())
-cta = st.button("Go", key="cta", disabled=disabled)
-if disabled:
-    st.markdown("<div class='hint'>Add both fields to continue.</div>", unsafe_allow_html=True)
+# CTA always enabled; validate on click only
+if st.button("Go", key="cta"):
+    resume_txt = (st.session_state.get("pasted_resume") or "").strip()
+    job_txt = (st.session_state.get("pasted_job") or "").strip()
+    if not resume_txt or not job_txt:
+        st.toast("Please paste both the job description and your résumé.", icon="⚠️")
+    else:
+        try:
+            with st.spinner("Updating…"):
+                payload = {"resume_text": resume_txt, "job_text": job_txt, "user_tweaks": {}}
+                r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
+                if r.status_code == 503:
+                    # Friendly strict-mode backend message, no banners
+                    try:
+                        msg = r.json().get("error") or "Service temporarily unavailable."
+                    except Exception:
+                        msg = "Service temporarily unavailable."
+                    st.toast(msg, icon="⚠️")
+                else:
+                    r.raise_for_status()
+                    data = r.json()
+                    st.session_state["tailored"] = {
+                        "tailored_resume_md": data.get("tailored_resume_md", ""),
+                        "cover_letter_md": data.get("cover_letter_md", ""),
+                    }
+                    st.session_state["insights"] = data.get("insights", {})
+                    # No success toast/banner; tabs appear below
+        except requests.exceptions.HTTPError as e:
+            st.toast(f"Update failed ({e.response.status_code}). Please try again.", icon="⚠️")
+        except Exception as e:
+            st.toast(f"Update failed. {e}", icon="⚠️")
 
-# Submit
-if cta and not disabled:
-    try:
-        with st.spinner("Updating…"):
-            payload = {
-                "resume_text": (st.session_state.get("pasted_resume") or "").strip(),
-                "job_text": (st.session_state.get("pasted_job") or "").strip(),
-                "user_tweaks": {},
-            }
-            r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-            if r.status_code == 503:
-                # Friendly message from strict backend
-                try:
-                    msg = r.json().get("error") or "Service temporarily unavailable."
-                except Exception:
-                    msg = "Service temporarily unavailable."
-                st.toast(msg, icon="⚠️")
-            else:
-                r.raise_for_status()
-                data = r.json()
-                st.session_state["tailored"] = {
-                    "tailored_resume_md": data.get("tailored_resume_md", ""),
-                    "cover_letter_md": data.get("cover_letter_md", ""),
-                }
-                st.session_state["insights"] = data.get("insights", {})
-                st.toast("Updated.", icon="✅")
-    except requests.exceptions.HTTPError as e:
-        st.toast(f"Update failed ({e.response.status_code}). Please try again.", icon="⚠️")
-    except Exception as e:
-        st.toast(f"Update failed. {e}", icon="⚠️")
-
-# Helpers
+# -------- Helpers for Summary & What changed --------
 def split_what_changed(md: str):
     if not md: return "", None
     m = re.search(r'(?im)^\s*\*\*what changed\*\*\s*', md)
@@ -176,25 +175,40 @@ def split_what_changed(md: str):
     return md[:m.start()].rstrip(), md[m.start():].lstrip()
 
 def split_summary(md: str):
+    """Find an explicit **Summary** block. If missing, try to derive a small intro paragraph from the top."""
     if not md: return None, md
-    lines = md.splitlines(); start = None
+    lines = md.splitlines()
+    # 1) explicit **Summary** header
     for i, line in enumerate(lines):
         if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
-            start = i; break
-    if start is None: return None, md
-    end = start + 1; saw_bullet = False
-    while end < len(lines):
-        s = lines[end].strip()
-        if s == "": end += 1; continue
-        if s.startswith(("-", "•", "*")): saw_bullet = True; end += 1; continue
-        if saw_bullet: break
-        break
-    summary_md = "\n".join(lines[start:end]).strip()
-    if summary_md.lower().strip() == "**summary**": return None, md
-    rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
-    return summary_md, rest_md
+            # collect paragraph/bullets under it
+            end = i + 1
+            saw_bullet = False
+            while end < len(lines):
+                s = lines[end].strip()
+                if s == "": end += 1; continue
+                if s.startswith(("-", "•", "*")): saw_bullet = True; end += 1; continue
+                if saw_bullet: break
+                break
+            summary_md = "\n".join(lines[i:end]).strip()
+            if summary_md.lower().strip() == "**summary**":
+                break  # empty summary header; fall through to fallback
+            rest_md = ("\n".join(lines[:i] + lines[end:])).strip()
+            return summary_md, rest_md
+    # 2) fallback: grab first non-empty, non-heading paragraph near the top
+    #    (for on-screen preview only; download stripping handled in backend)
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", md) if b.strip()]
+    if blocks:
+        first = blocks[0]
+        # reject if it looks like a heading block (ALL CAPS or starts with **Heading**)
+        if not (first.isupper() or re.match(r"^\s*\*\*[^*]+\*\*\s*$", first)):
+            # treat this as a soft "summary" for display
+            rest = md[len(first):].lstrip()
+            fake = "**Summary**\n" + first
+            return fake, rest
+    return None, md
 
-# Results
+# ---------------- Results ----------------
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
@@ -222,7 +236,7 @@ if tailored:
 
     # Downloads
     with tabs[2]:
-        resume_md = resume_md_full  # backend export will clean Summary/What changed
+        resume_md = resume_md_full  # backend export strips Summary/What changed
         sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
         if st.session_state.get("docx_sig") != sig:
             st.session_state["docx_sig"] = sig
