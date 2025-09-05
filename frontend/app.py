@@ -1,4 +1,4 @@
-# app.py — uses backend what_changed_md, prefetch exports, summary above resume, pill tabs
+# app.py — radio “tabs” (persist selection), summary above resume, prefetch exports, busy lock
 
 import os
 import json
@@ -16,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor
 DEFAULT_BACKEND = "https://pathio-c9yz.onrender.com"
 backend_url = os.getenv("BACKEND_URL", DEFAULT_BACKEND).rstrip("/")
 
-# Wake backend early to reduce later lag (ignore errors silently)
 try:
     requests.get(f"{backend_url}/healthz", timeout=3)
 except Exception:
@@ -26,170 +25,99 @@ except Exception:
 # Alt View: How-to mini chat
 # =========================
 qp = st.query_params
-
 if qp.get("view") == "chat":
     seed = unquote(qp.get("prompt", "")) if qp.get("prompt") else ""
-    st.set_page_config(
-        page_title=("How-to" if not seed else f"How-to: {seed}"),
-        page_icon="pathio-logo.png",
-        layout="centered",
-    )
-
+    st.set_page_config(page_title=("How-to" if not seed else f"How-to: {seed}"),
+                       page_icon="pathio-logo.png", layout="centered")
     st.markdown(
-        """
-        <style>
-          .chat-title { font-size:20px; font-weight:700; margin:4px 0 2px 0; letter-spacing:.2px; }
-          .chat-subtle { font-size:13px; opacity:.75; margin-bottom:6px; }
-        </style>
-        """,
+        "<style>.chat-title{font-size:20px;font-weight:700;margin:4px 0 2px 0}.chat-subtle{font-size:13px;opacity:.75;margin-bottom:6px}</style>",
         unsafe_allow_html=True,
     )
-
     title = f"How-to: {seed}" if seed else "How-to Guide"
     st.markdown(f"<div class='chat-title'>{title}</div>", unsafe_allow_html=True)
     st.markdown("<div class='chat-subtle'>Practical, step-by-step instructions.</div>", unsafe_allow_html=True)
     st.divider()
-
     st.session_state.setdefault("chat_messages", [])
-
     def fallback_steps(prompt: str) -> str:
-        return (
-            "**Starter steps:**\n"
-            "1) Break the task into 4–6 steps with outcomes.\n"
-            "2) Timebox step 1 to 20 minutes and start.\n"
-            "3) Save evidence (doc/clip) and iterate once.\n"
-        )
-
+        return ("**Starter steps:**\n"
+                "1) Break the task into 4–6 steps with outcomes.\n"
+                "2) Timebox step 1 to 20 minutes and start.\n"
+                "3) Save evidence (doc/clip) and iterate once.\n")
     if seed and not st.session_state["chat_messages"]:
-        st.session_state["chat_messages"].append({"role": "user", "content": seed})
+        st.session_state["chat_messages"].append({"role":"user","content":seed})
         try:
             r = requests.post(f"{backend_url}/coach", json={"messages": st.session_state["chat_messages"]}, timeout=60)
-            r.raise_for_status()
-            data = r.json()
+            r.raise_for_status(); data = r.json()
             reply = (data.get("reply") or "").strip() or fallback_steps(seed)
         except Exception:
             reply = fallback_steps(seed)
-        st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
-
+        st.session_state["chat_messages"].append({"role":"assistant","content":reply})
     for m in st.session_state["chat_messages"]:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
-
     user_msg = st.chat_input("Ask a follow-up…")
     if user_msg:
-        st.session_state["chat_messages"].append({"role": "user", "content": user_msg})
+        st.session_state["chat_messages"].append({"role":"user","content":user_msg})
         with st.chat_message("assistant"):
             try:
                 r = requests.post(f"{backend_url}/coach", json={"messages": st.session_state["chat_messages"]}, timeout=120)
-                r.raise_for_status()
-                data = r.json()
+                r.raise_for_status(); data = r.json()
                 reply = (data.get("reply") or "").strip() or fallback_steps(user_msg)
             except Exception:
                 reply = fallback_steps(user_msg)
             st.markdown(reply)
-        st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
+        st.session_state["chat_messages"].append({"role":"assistant","content":reply})
         st.rerun()
-
-    st.stop()
-
-# Hidden future page (placeholder)
-if qp.get("view") == "future":
-    st.set_page_config(page_title="Explore jobs", page_icon="pathio-logo.png", layout="centered")
-    st.title("Explore future jobs")
-    st.info("This page is coming soon.")
     st.stop()
 
 # =========================
 # MAIN APP
 # =========================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
+st.markdown("""
+<style>
+  #MainMenu, footer, header {visibility:hidden;}
+  :root{--blue-700:#1d3a9b;--blue-600:#1e40af;--blue-500:#2563eb;--blue-100:#eef4ff;
+        --ink-900:#0f172a;--ink-700:#334155;--ink-600:#475569;--border:#e6edf7;--white:#ffffff;}
+  .main .block-container{max-width:860px;padding-top:2rem;padding-bottom:2rem}
+  .app *{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Open Sans","Helvetica Neue",sans-serif!important;color:var(--ink-900)}
+  .brand{font-size:32px;font-weight:700;letter-spacing:.2px;margin:0}
+  .tagline{font-size:16px;font-weight:400;color:var(--ink-700);margin:.4rem 0 1rem 0;line-height:1.5}
+  .stMarkdown p,.stMarkdown li{font-size:13px!important}
+  .stMarkdown h1,.stMarkdown h2,.stMarkdown h3{font-size:16px!important;font-weight:700!important;margin:12px 0 8px 0!important}
+  textarea,.stTextInput input{font-size:13px!important;background:var(--white)!important;border:1px solid var(--border)!important;border-radius:12px!important}
+  textarea::placeholder,.stTextInput input::placeholder{color:var(--ink-600)!important;opacity:.9!important;font-size:15px!important}
 
-st.markdown(
-    """
-    <style>
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-      header {visibility: hidden;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+  /* Remove streamlit container chrome */
+  .st-emotion-cache-1r6slb0,.st-emotion-cache-13ln4jf,div[role="region"][aria-label][tabindex="-1"]{
+    padding:0!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important
+  }
 
-# ---------- Style (pill tabs, blue palette, subtle UI) ----------
-st.markdown(
-    """
-    <style>
-      :root{
-        --blue-700:#1d3a9b; --blue-600:#1e40af; --blue-500:#2563eb; --blue-100:#eef4ff;
-        --ink-900:#0f172a; --ink-700:#334155; --ink-600:#475569; --border:#e6edf7; --white:#ffffff;
-      }
-      .main .block-container{ max-width:860px; padding-top:2rem; padding-bottom:2rem; }
-      .app *{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Open Sans","Helvetica Neue",sans-serif!important; color:var(--ink-900); }
-      .brand{ font-size:32px; font-weight:700; letter-spacing:.2px; margin:0; }
-      .tagline{ font-size:16px; font-weight:400; color:var(--ink-700); margin:.4rem 0 1rem 0; line-height:1.5; }
-      .stMarkdown p,.stMarkdown li{ font-size:13px!important; }
-      .stMarkdown h1,.stMarkdown h2,.stMarkdown h3{ font-size:16px!important; font-weight:700!important; margin:12px 0 8px 0!important; }
-      textarea,.stTextInput input{ font-size:13px!important; background:var(--white)!important; border:1px solid var(--border)!important; border-radius:12px!important; }
-      textarea::placeholder,.stTextInput input::placeholder{ color:var(--ink-600)!important; opacity:.9!important; font-size:15px!important; }
+  /* Radio-as-tabs */
+  .tabwrap{display:flex;gap:6px;background:var(--blue-100);border-radius:12px;padding:6px;margin-bottom:12px}
+  .stRadio > div{display:flex;gap:6px}
+  .stRadio label{display:none}
+  .stRadio div[role="radiogroup"]{display:flex;gap:6px}
+  .stRadio div[role="radio"]{padding:6px 10px;border-radius:10px;border:1px solid transparent}
+  .stRadio div[aria-checked="true"]{background:var(--white);color:var(--blue-700);border:1px solid var(--border);box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .stRadio div[aria-checked="false"]{color:var(--blue-600)}
+</style>
+<div class="app"></div>
+""", unsafe_allow_html=True)
 
-      /* Remove Streamlit card chrome */
-      .st-emotion-cache-1r6slb0, .st-emotion-cache-13ln4jf, div[role="region"][aria-label][tabindex="-1"]{
-        padding:0!important; background:transparent!important; border:0!important;
-        border-radius:0!important; box-shadow:none!important; overflow:visible!important;
-      }
+# Header
+st.markdown("""
+<div style="text-align:center;margin-bottom:.6rem;">
+  <div class="brand">PATHIO</div>
+  <div class="tagline">
+    ✔ Tailor your résumé<br>
+    ✔ Generate a cover letter<br>
+    ✔ Get steps to be a stronger candidate
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-      /* Pill tabs */
-      div[role="tablist"]{
-        display:flex; gap:6px; padding:6px; border:0!important; background:var(--blue-100);
-        border-radius:12px; margin-bottom:12px;
-      }
-      button[role="tab"]{
-        color:var(--blue-600)!important; background:transparent!important; border-radius:10px!important;
-        padding:6px 10px!important; box-shadow:none!important; border:0!important; outline:none!important;
-      }
-      button[role="tab"]::after{ display:none!important; }
-      button[role="tab"][aria-selected="true"]{
-        background:var(--white)!important; color:var(--blue-700)!important;
-        border:1px solid var(--border)!important; box-shadow:0 1px 2px rgba(0,0,0,.03)!important;
-      }
-
-      /* Button */
-      .stButton button{
-        font-size:16px!important; font-weight:700!important; border-radius:12px!important; padding:10px 16px!important;
-        background:var(--blue-600)!important; color:#fff!important; border:1px solid var(--blue-600)!important;
-      }
-      .stButton button:hover{ filter:brightness(0.97); }
-
-      /* Step badges */
-      .step-row{ display:flex; align-items:center; gap:.5rem; margin:8px 2px; }
-      .step-badge{
-        display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:999px;
-        background:var(--blue-100); color:var(--blue-600); font-weight:700; font-size:12px; border:0;
-      }
-      .step-title{ font-weight:700; font-size:14px; color:var(--ink-900); }
-      .step-hint{ font-weight:500; font-size:13px; color:var(--ink-600); margin-left:.35rem; }
-    </style>
-    <div class="app"></div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------- Header ----------
-st.markdown(
-    """
-    <div style="text-align:center;margin-bottom:.6rem;">
-      <div class="brand">PATHIO</div>
-      <div class="tagline">
-        ✔ Tailor your résumé<br>
-        ✔ Generate a cover letter<br>
-        ✔ Get steps to be a stronger candidate
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------- State ----------
+# State
 st.session_state.setdefault("pasted_resume", "")
 st.session_state.setdefault("pasted_job", "")
 st.session_state.setdefault("tailored", None)
@@ -199,8 +127,10 @@ st.session_state.setdefault("cover_docx", None)
 st.session_state.setdefault("docx_sig", None)
 st.session_state.setdefault("resume_export_error", None)
 st.session_state.setdefault("cover_export_error", None)
+st.session_state.setdefault("busy", False)
+st.session_state.setdefault("active_tab", "Updated résumé")
 
-# ---------- Helpers ----------
+# Helpers
 def split_summary(md: str):
     """Return (summary_md_without_header, rest_md) or (None, full_md)."""
     if not md:
@@ -209,41 +139,24 @@ def split_summary(md: str):
     start = None
     for i, line in enumerate(lines):
         if re.match(r'^\s*\*\*summary\*\*\s*$', line.strip(), re.IGNORECASE):
-            start = i
-            break
+            start = i; break
     if start is None:
         return None, md
-    end = start + 1
-    saw_bullet = False
+    end = start + 1; saw_b = False
     while end < len(lines):
         s = lines[end].strip()
-        if s == "":
-            end += 1
-            continue
-        if s.startswith(("-", "•", "*")):
-            saw_bullet = True
-            end += 1
-            continue
-        if saw_bullet:
-            break
+        if s == "": end += 1; continue
+        if s.startswith(("-", "•", "*")): saw_b = True; end += 1; continue
+        if saw_b: break
         break
-    summary_block = "\n".join(lines[start:end]).strip()
-    if summary_block.lower().strip() == "**summary**":
-        return None, md
-    summary_no_header = summary_block.replace("**Summary**", "").strip()
-    rest_md = ("\n".join(lines[:start] + lines[end:])).strip()
-    return summary_no_header, rest_md
+    blk = "\n".join(lines[start:end]).strip()
+    if blk.lower().strip() == "**summary**": return None, md
+    return blk.replace("**Summary**", "").strip(), ("\n".join(lines[:start] + lines[end:])).strip()
 
 def prefetch_exports(resume_md: str, cover_md: str):
-    """Fetch resume + cover DOCX concurrently and cache in session_state."""
     sig = hashlib.md5((resume_md + "||" + cover_md).encode("utf-8")).hexdigest()
-    if (
-        st.session_state.get("docx_sig") == sig
-        and st.session_state.get("resume_docx") is not None
-        and st.session_state.get("cover_docx") is not None
-    ):
+    if st.session_state.get("docx_sig") == sig and st.session_state.get("resume_docx") and st.session_state.get("cover_docx"):
         return
-
     st.session_state["docx_sig"] = sig
     st.session_state["resume_docx"] = None
     st.session_state["cover_docx"] = None
@@ -251,11 +164,7 @@ def prefetch_exports(resume_md: str, cover_md: str):
     st.session_state["cover_export_error"] = None
 
     def fetch(which: str):
-        payload = {
-            "tailored_resume_md": resume_md,
-            "cover_letter_md": cover_md,
-            "which": which,
-        }
+        payload = {"tailored_resume_md": resume_md, "cover_letter_md": cover_md, "which": which}
         r = requests.post(f"{backend_url}/export", json=payload, timeout=40)
         ct = (r.headers.get("Content-Type") or "").lower()
         if r.ok and "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in ct:
@@ -266,113 +175,97 @@ def prefetch_exports(resume_md: str, cover_md: str):
             return None, f"Export failed with status {r.status_code}."
 
     with ThreadPoolExecutor(max_workers=2) as ex:
-        fut_res = ex.submit(fetch, "resume")
-        fut_cov = ex.submit(fetch, "cover")
-        res_bytes, res_err = fut_res.result()
-        cov_bytes, cov_err = fut_cov.result()
+        res_f = ex.submit(fetch, "resume")
+        cov_f = ex.submit(fetch, "cover")
+        res_b, res_e = res_f.result()
+        cov_b, cov_e = cov_f.result()
+    if res_e: st.session_state["resume_export_error"] = res_e
+    else:     st.session_state["resume_docx"] = res_b
+    if cov_e: st.session_state["cover_export_error"] = cov_e
+    else:     st.session_state["cover_docx"] = cov_b
 
-    if res_err:
-        st.session_state["resume_export_error"] = res_err
-    else:
-        st.session_state["resume_docx"] = res_bytes
+# Inputs
+st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
+st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
+st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
+st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
 
-    if cov_err:
-        st.session_state["cover_export_error"] = cov_err
-    else:
-        st.session_state["cover_docx"] = cov_bytes
-
-# ---------- Inputs ----------
-st.markdown(
-    "<div class='step-row'><div class='step-badge'>1</div>"
-    "<div class='step-title'>Start with the job you want</div>"
-    "<div class='step-hint'>Paste job description.</div></div>",
-    unsafe_allow_html=True,
-)
-job_text = st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
-
-st.markdown(
-    "<div class='step-row'><div class='step-badge'>2</div>"
-    "<div class='step-title'>Paste your résumé</div></div>",
-    unsafe_allow_html=True,
-)
-resume_text = st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
-
-# CTA: disabled until both have content; no captions/toasts on load
 both_present = (st.session_state.get("pasted_job") or "").strip() and (st.session_state.get("pasted_resume") or "").strip()
-cta = st.button("Go", key="cta", disabled=not both_present)
-
-# Submit
-if cta and both_present:
-    try:
-        with st.spinner("Updating…"):
-            payload = {
-                "resume_text": (st.session_state.get("pasted_resume") or "").strip(),
-                "job_text": (st.session_state.get("pasted_job") or "").strip(),
-                "user_tweaks": {},
-            }
-            r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
-            if r.status_code == 503:
-                try:
-                    msg = r.json().get("error") or "Service temporarily unavailable."
-                except Exception:
-                    msg = "Service temporarily unavailable."
-                st.error(msg)
-            else:
-                r.raise_for_status()
-                data = r.json()
-                st.session_state["tailored"] = {
-                    "tailored_resume_md": data.get("tailored_resume_md", ""),
-                    "cover_letter_md": data.get("cover_letter_md", ""),
-                    "what_changed_md": data.get("what_changed_md", ""),  # NEW: from backend
+disabled = (not both_present) or st.session_state["busy"]
+if st.button("Go", key="cta", disabled=disabled):
+    if disabled:
+        pass
+    else:
+        st.session_state["busy"] = True
+        try:
+            with st.spinner("Updating…"):
+                payload = {
+                    "resume_text": (st.session_state.get("pasted_resume") or "").strip(),
+                    "job_text": (st.session_state.get("pasted_job") or "").strip(),
+                    "user_tweaks": {},
                 }
-                st.session_state["insights"] = data.get("insights", {})
+                r = requests.post(f"{backend_url}/quick-tailor", json=payload, timeout=120)
+                if r.status_code == 503:
+                    try:
+                        msg = r.json().get("error") or "Service temporarily unavailable."
+                    except Exception:
+                        msg = "Service temporarily unavailable."
+                    st.error(msg)
+                else:
+                    r.raise_for_status()
+                    data = r.json()
+                    st.session_state["tailored"] = {
+                        "tailored_resume_md": data.get("tailored_resume_md", ""),
+                        "cover_letter_md": data.get("cover_letter_md", ""),
+                        "what_changed_md": data.get("what_changed_md", ""),
+                    }
+                    st.session_state["insights"] = data.get("insights", {})
+                    # Pre-warm downloads
+                    try:
+                        prefetch_exports(
+                            st.session_state["tailored"]["tailored_resume_md"],
+                            st.session_state["tailored"]["cover_letter_md"],
+                        )
+                    except Exception as e:
+                        st.session_state["resume_export_error"] = f"{e}"
+                        st.session_state["cover_export_error"] = f"{e}"
+                    # jump user to first results tab
+                    st.session_state["active_tab"] = "Updated résumé"
+        except requests.exceptions.HTTPError as e:
+            st.error(f"Update failed ({e.response.status_code}). Please try again.")
+        except Exception as e:
+            st.error(f"Update failed. {e}")
+        finally:
+            st.session_state["busy"] = False
 
-                # Prefetch DOCX now so buttons are instant later
-                try:
-                    prefetch_exports(
-                        st.session_state["tailored"]["tailored_resume_md"],
-                        st.session_state["tailored"]["cover_letter_md"],
-                    )
-                except Exception as e:
-                    st.session_state["resume_export_error"] = f"{e}"
-                    st.session_state["cover_export_error"] = f"{e}"
-    except requests.exceptions.HTTPError as e:
-        st.error(f"Update failed ({e.response.status_code}). Please try again.")
-    except Exception as e:
-        st.error(f"Update failed. {e}")
-
-# ---------- Results ----------
+# Results
 tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
 if tailored:
     resume_md_full = tailored.get("tailored_resume_md", "")
-    # We no longer parse "what changed" from the resume. Use backend field directly.
-    changes_md = tailored.get("what_changed_md", "") or None
-
-    # Still allow Summary extraction (if the LLM included a **Summary** section)
+    changes_md = (tailored.get("what_changed_md") or "").strip() or None
     summary_md, body_md = split_summary(resume_md_full)
     cover_md = tailored.get("cover_letter_md", "")
 
-    tab_labels = ["Updated résumé", "Cover letter", "Downloads"]
-    if changes_md:
-        tab_labels.append("What changed")
-    tab_labels += ["Insights", "Be a better candidate"]
-    tabs = st.tabs(tab_labels)
+    # Radio-as-tabs keeps selection across reruns (prevents snap-back)
+    options = ["Updated résumé", "Cover letter", "Downloads"]
+    if changes_md: options.append("What changed")
+    options += ["Insights", "Be a better candidate"]
 
-    # Updated résumé (summary shown ABOVE the body)
-    with tabs[0]:
+    st.markdown("<div class='tabwrap'></div>", unsafe_allow_html=True)
+    tab = st.radio("", options=options, horizontal=True, key="active_tab")
+
+    if tab == "Updated résumé":
         if summary_md:
-            st.markdown(summary_md)   # summary (no "**Summary**" header)
-            st.markdown("")           # tiny spacer
+            st.markdown(summary_md)
+            st.markdown("")  # spacer
         st.markdown(body_md if body_md else resume_md_full, unsafe_allow_html=False)
 
-    # Cover letter
-    with tabs[1]:
+    elif tab == "Cover letter":
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads (prefetched; no network calls now)
-    with tabs[2]:
+    elif tab == "Downloads":
         resume_blob = st.session_state.get("resume_docx")
         cover_blob = st.session_state.get("cover_docx")
         res_err = st.session_state.get("resume_export_error")
@@ -403,15 +296,10 @@ if tailored:
             if cov_err and cover_blob is None:
                 st.caption(f"Export issue: {cov_err}")
 
-    # What changed (optional)
-    idx = 3
-    if changes_md:
-        with tabs[idx]:
-            st.markdown(changes_md, unsafe_allow_html=False)
-        idx += 1
+    elif tab == "What changed":
+        st.markdown(changes_md, unsafe_allow_html=False)
 
-    # Insights
-    with tabs[idx]:
+    elif tab == "Insights":
         try:
             if isinstance(insights, str):
                 insights = json.loads(insights)
@@ -420,24 +308,20 @@ if tailored:
         score = int((insights or {}).get("match_score") or 0)
         missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
-
         st.markdown(f"**Match score:** {score}%")
         st.progress(max(0, min(score, 100)) / 100.0)
-
         if missing:
             st.markdown("**Missing keywords**")
             st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
         else:
             st.markdown("**No critical keywords missing**")
-
         if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
             st.markdown("**ATS checks**")
             st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
         else:
             st.markdown("**Passed automated parsing checks (ATS).**")
 
-    # Be a better candidate
-    with tabs[idx + 1]:
+    elif tab == "Be a better candidate":
         try:
             if isinstance(insights, str):
                 insights = json.loads(insights)
