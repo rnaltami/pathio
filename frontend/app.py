@@ -272,6 +272,8 @@ if st.button("Go", key="cta"):
                             "what_changed_md": data.get("what_changed_md", ""),
                         }
                         st.session_state["insights"] = data.get("insights", {})
+                        st.session_state["llm_ok"] = bool(data.get("llm_ok", True))
+                        st.session_state["llm_error"] = data.get("error")
                         # Prefetch downloads
                         try:
                             prefetch_exports(
@@ -295,6 +297,17 @@ tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
 if tailored:
+     # LLM failure banner (visible even with .stAlert hidden)
+    if not st.session_state.get("llm_ok", True):
+        st.markdown(
+            """
+            <div style="border:1px solid #fecaca; background:#fef2f2; color:#7f1d1d;
+                        padding:10px 12px; border-radius:10px; font-weight:600; margin-bottom:8px;">
+              AI service unavailable right now — showing heuristic-only insights.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     resume_md_full = tailored.get("tailored_resume_md", "") or ""
     changes_md = (tailored.get("what_changed_md") or "").strip() or None
     summary_md, body_md = split_summary(resume_md_full)

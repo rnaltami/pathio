@@ -182,22 +182,21 @@ def quick_tailor(req: QuickTailorRequest):
         raise HTTPException(status_code=400, detail="Both resume_text and job_text are required.")
 
     tailored_md, cover_md, what_changed_md = call_llm_tailor(resume_text, job_text)
-    if not tailored_md or not cover_md:
-        return JSONResponse(
-            status_code=503,
-            content={"error": "Tailoring service temporarily unavailable. Please try again in a minute."},
-        )
+    llm_ok = bool(tailored_md and cover_md)
 
-    # Safe, non-fabricating insights
+    # Safe, non-fabricating insights (always computed)
     score, missing = _match_and_missing(resume_text, job_text)
     do_now, do_long = _actions_from_missing(missing)
 
+    # Return a consistent payload whether LLM worked or not
     return {
-        "tailored_resume_md": tailored_md,
-        "cover_letter_md": cover_md,
-        "what_changed_md": what_changed_md or "",
+        "tailored_resume_md": tailored_md if llm_ok else "",
+        "cover_letter_md": cover_md if llm_ok else "",
+        "what_changed_md": (what_changed_md or "") if llm_ok else "",
+        "llm_ok": llm_ok,
+        "error": None if llm_ok else "llm_unavailable",
         "insights": {
-            "engine": "llm+heuristic",
+            "engine": "llm+heuristic" if llm_ok else "heuristic-only",
             "match_score": score,
             "missing_keywords": missing,
             "ats_flags": ["none"],
@@ -205,6 +204,7 @@ def quick_tailor(req: QuickTailorRequest):
             "do_long": do_long,
         },
     }
+
 
 @router.post("/coach")
 def coach(req: ChatRequest):
