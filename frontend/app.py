@@ -361,6 +361,7 @@ if tailored:
                 key="dl_resume",
             ):
                 st.session_state["active_tab"] = "Downloads"
+                st.rerun()  # <- add this line
         if res_err and resume_blob is None:
             st.caption(f"Export issue: {res_err}")
 
@@ -374,6 +375,8 @@ if tailored:
                 key="dl_cover",
             ):
                 st.session_state["active_tab"] = "Downloads"
+                st.rerun()  # <- add this line
+        
         if cov_err and cover_blob is None:
             st.caption(f"Export issue: {cov_err}")
 

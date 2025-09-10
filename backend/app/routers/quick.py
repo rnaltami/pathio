@@ -38,7 +38,6 @@ if _client is None and OPENAI_API_KEY:
 
 router = APIRouter()
 
-# ---------- Keyword filtering for Insights ----------
 # ---------- Keyword filtering for Insights (improved) ----------
 _STOPWORDS = {
     # common function words
@@ -122,6 +121,120 @@ def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[
     missing = sorted(J - R)[:cap]  # deterministic & readable
 
     return max(0, min(100, score)), missing
+
+# ---------- JD -> required phrases extraction ----------
+_SECTION_HDRS = [
+    "qualifications", "preferred qualifications", "preferred qualifications include",
+    "it is expected", "responsibilities", "requirements", "what you'll do", "what you will do"
+]
+_BULLET = re.compile(r"^\s*[-*•]\s+(.*)$", re.IGNORECASE)
+
+def _clean_phrase(s: str) -> str:
+    s = (s or "").strip()
+    s = re.sub(r"[()•·•–—]", " ", s)
+    s = re.sub(r"[:;.,]+$", "", s)           # trim trailing punctuation
+    s = re.sub(r"\s{2,}", " ", s)
+    s = s.lower()
+    # remove pure stopword phrases
+    words = [w for w in re.findall(r"[a-zA-Z][a-zA-Z+#.-]*", s) if w not in _STOPWORDS]
+    if not words:
+        return ""
+    # very short filler words left? drop if meaningless
+    if len(words) == 1 and words[0] in _STOPWORDS:
+        return ""
+    return " ".join(words)
+
+def _extract_required_phrases(job_text: str) -> list[str]:
+    """
+    Pulls requirement-like bullets from JD sections:
+    - Qualifications / Preferred Qualifications / It is expected... / Responsibilities
+    Falls back to any bullet lines if those headers aren't found.
+    Returns ordered, deduped, cleaned short phrases (1–6 words).
+    """
+    lines = (job_text or "").splitlines()
+    phrases: list[str] = []
+    current = None
+
+    def add_line(ln: str):
+        ph = _clean_phrase(ln)
+        if not ph:
+            return
+        # limit length to 1–6 words to keep phrases focused
+        if 1 <= len(ph.split()) <= 6:
+            phrases.append(ph)
+
+    # scan for sections
+    for i, ln in enumerate(lines):
+        l = ln.strip().lower()
+        if any(h in l for h in _SECTION_HDRS):
+            current = "section"
+            continue
+        if current == "section":
+            m = _BULLET.match(ln)
+            if m:
+                add_line(m.group(1))
+            else:
+                # end section when we hit a blank line or new header-ish line
+                if l == "" or re.match(r"^[A-Z][A-Za-z ]{2,}:?$", ln.strip()):
+                    current = None
+
+    # fallback to any bullets if nothing found
+    if not phrases:
+        for ln in lines:
+            m = _BULLET.match(ln)
+            if m:
+                add_line(m.group(1))
+
+    # dedupe in order
+    seen = set()
+    out = []
+    for p in phrases:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+# ---------- Résumé coverage vs phrases ----------
+def _resume_token_sets(resume_text: str) -> tuple[set[str], set[str]]:
+    """
+    Return (unigrams, bigrams) from resume for simple phrase coverage checks.
+    """
+    toks = [t for t in re.findall(r"[a-zA-Z][a-zA-Z+#.-]*", (resume_text or "").lower())
+            if t not in _STOPWORDS and len(t) >= 2 and not any(ch.isdigit() for ch in t)]
+    unigrams = set(_singularize(t) for t in toks)
+    bigrams = set()
+    for a, b in zip(toks, toks[1:]):
+        a, b = _singularize(a), _singularize(b)
+        if a in _STOPWORDS or b in _STOPWORDS: 
+            continue
+        bigrams.add(f"{a} {b}")
+    return unigrams, bigrams
+
+def _covered(phrase: str, uni: set[str], bi: set[str]) -> bool:
+    """Phrase is covered if it's a bigram present OR all its unigrams appear."""
+    words = phrase.split()
+    if len(words) >= 2 and phrase in bi:
+        return True
+    return all(_singularize(w) in uni for w in words)
+
+def _score_and_missing_from_required(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str], list[str]]:
+    """
+    Compute coverage against extracted required phrases.
+    Returns (score%, missing_phrases, used_phrases).
+    """
+    reqs = _extract_required_phrases(job_text)
+    uni, bi = _resume_token_sets(resume_text)
+    if not reqs:
+        return 0, [], []
+
+    used, missing = [], []
+    for p in reqs:
+        if _covered(p, uni, bi):
+            used.append(p)
+        else:
+            missing.append(p)
+    score = int(round(100 * len(used) / max(1, len(reqs))))
+    return max(0, min(100, score)), missing[:cap], used
 
 
 # =========================
@@ -241,41 +354,30 @@ def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[
 
 
 def _actions_from_missing(missing: list[str], job_text: str = "") -> tuple[list[str], list[str]]:
-    """
-    Generate concrete 'do now' and 'do long' actions.
-    If the role looks like admissions/application reading, use domain-tailored tasks.
-    Otherwise, fall back to neutral actions referencing top missing keywords.
-    """
-    # Detect admissions/application-reader context
     jt = (job_text or "").lower()
-    is_admissions = (
-        ("admission" in jt or "admissions" in jt) and
-        ("application" in jt or "evaluate" in jt or "reader" in jt)
-    )
-
-    top = [w for w in missing if len(w) >= 3][:3]
-    joined = ", ".join(top) if top else "key requirements"
+    is_admissions = (("admission" in jt or "admissions" in jt) and ("application" in jt or "evaluate" in jt or "reader" in jt))
+    top = [w for w in missing if len(w.split()) >= 1][:3]
+    joined = ", ".join(top) if top else "key criteria"
 
     if is_admissions:
         do_now = [
-            "Skim 3–5 sample applications and practice writing 120–180-word narrative summaries using a consistent structure (context → academics → activities → contribution potential).",
-            "Draft a one-page rubric for evaluating curriculum rigor, academic performance, extracurricular impact, and community contribution; test it on one sample.",
-            "Set up a secure, organized workspace (folders, naming) and log template to ensure confidential handling and timely completion.",
+            "Complete a quick FERPA refresher and write a 5-bullet checklist for confidential handling.",
+            "Practice 3 narrative summaries (120–180 words each) using a structured template: context → academics → activities → contribution potential.",
+            "Draft a one-page rubric to rate curriculum rigor, academic performance, extracurricular impact, and community fit; test it on one sample file."
         ]
         do_long = [
-            "Build a 3–4 page 'reader handbook' for yourself: common patterns, red flags, and exemplar narratives tailored to selective liberal arts contexts.",
-            "Complete a self-paced practice sprint: 10 timed reads (20–25 min each), track pace and accuracy, and iterate your rubric once.",
+            "Run a timed reading sprint of 10 sample files (20–25 minutes each). Track pace + quality, then iterate your rubric once.",
+            "Create a 3–4 page 'reader handbook' with exemplar narratives, common patterns, and edge cases relevant to selective liberal-arts contexts."
         ]
     else:
-        # neutral fallback referencing actual missing keywords
         do_now = [
             f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
             "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
-            "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)",
+            "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)"
         ]
         do_long = [
             "Turn one artifact into a portfolio piece with a clear README and trade-offs. (time ~1–2 wks)",
-            "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)",
+            "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)"
         ]
     return do_now, do_long
 
@@ -353,17 +455,11 @@ def quick_tailor(req: QuickTailorRequest):
 
     tailored_md, cover_md, what_changed_md = call_llm_tailor(resume_text, job_text)
     llm_ok = bool(tailored_md and cover_md)
-   
-    if not what_changed_md and llm_ok:
-    # fallback: generate concrete changes via diff
-     changes = _heuristic_changes(resume_text, tailored_md)
-     what_changed_md = "\n".join(f"- {c}" for c in changes)
 
-    # Safe, non-fabricating insights (always computed)
-    score, missing = _match_and_missing(resume_text, job_text)
+    # NEW: score against extracted required phrases
+    score, missing, used = _score_and_missing_from_required(resume_text, job_text)
     do_now, do_long = _actions_from_missing(missing, job_text=job_text)
 
-    # Return a consistent payload whether LLM worked or not
     return {
         "tailored_resume_md": tailored_md if llm_ok else "",
         "cover_letter_md": cover_md if llm_ok else "",
@@ -373,12 +469,14 @@ def quick_tailor(req: QuickTailorRequest):
         "insights": {
             "engine": "llm+heuristic" if llm_ok else "heuristic-only",
             "match_score": score,
-            "missing_keywords": missing,
+            "missing_keywords": missing,     # now real requirement phrases
+            "present_keywords": used,        # handy if you want to display covered items
             "ats_flags": ["none"],
             "do_now": do_now,
             "do_long": do_long,
         },
     }
+
 
 
 @router.post("/coach")
