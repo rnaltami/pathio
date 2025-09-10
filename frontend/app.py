@@ -331,6 +331,10 @@ if tailored:
     st.session_state.setdefault("active_tab", "Updated résumé")
 
     # Prefer segmented control; fall back to radio if not available
+    if st.session_state.get("stay_on"):
+     st.session_state["active_tab"] = st.session_state["stay_on"]
+    del st.session_state["stay_on"]
+
     try:
         active = st.segmented_control("Sections", options=tabs_fixed, key="active_tab", label_visibility="collapsed")
     except Exception:
@@ -364,7 +368,7 @@ if tailored:
                 disabled=(resume_blob is None),
                 key="dl_resume",
             ):
-                st.session_state["active_tab"] = "Downloads"
+                st.session_state["stay_on"] = "Downloads"
                 st.rerun()
         if res_err and resume_blob is None:
             st.caption(f"Export issue: {res_err}")
@@ -378,7 +382,7 @@ if tailored:
                 disabled=(cover_blob is None),
                 key="dl_cover",
             ):
-                st.session_state["active_tab"] = "Downloads"
+                st.session_state["stay_on"] = "Downloads"
                 st.rerun()
         if cov_err and cover_blob is None:
             st.caption(f"Export issue: {cov_err}")

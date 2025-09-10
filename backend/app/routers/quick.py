@@ -231,6 +231,32 @@ def _score_and_missing_from_required(resume_text: str, job_text: str, cap: int =
         (used if _covered(p, uni, bi) else missing).append(p)
     score = int(round(100 * len(used) / max(1, len(reqs))))
     return max(0, min(100, score)), missing[:cap], used
+def _score_and_missing_hybrid(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str], list[str]]:
+    """
+    Hybrid scorer:
+      1) If we can extract requirement phrases from the JD, score coverage vs those phrases.
+      2) Otherwise, fall back to full-text token overlap with your filtered tokenizer.
+    Returns: (score%, missing_items, present_items)
+    """
+    # Try requirement phrase coverage first
+    reqs = _extract_required_phrases(job_text)
+    if reqs:
+        uni, bi = _resume_token_sets(resume_text)
+        used, missing = [], []
+        for p in reqs:
+            (used if _covered(p, uni, bi) else missing).append(p)
+        score = int(round(100 * len(used) / max(1, len(reqs))))
+        return max(0, min(100, score)), missing[:cap], used
+
+    # Fallback: full-text token overlap (robust when JD is free-form or only a title)
+    R = _tokset(resume_text)
+    J = _tokset(job_text)
+    if not J:
+        return 0, [], []
+    overlap = sorted(R & J)
+    missing = sorted(J - R)[:cap]
+    score = int(round(100 * len(overlap) / max(1, len(J))))
+    return max(0, min(100, score)), missing, overlap
 
 # =========================
 # Models
@@ -460,7 +486,7 @@ def quick_tailor(req: QuickTailorRequest):
     llm_ok = bool(tailored_md and cover_md)
 
     # Score against extracted required phrases
-    score, missing, used = _score_and_missing_from_required(resume_text, job_text)
+    score, missing, used = _score_and_missing_hybrid(resume_text, job_text)
     do_now, do_long = _actions_from_missing(missing, job_text=job_text)
 
     return {
