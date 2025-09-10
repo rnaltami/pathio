@@ -326,7 +326,7 @@ if tailored:
     tabs_fixed = ["Updated résumé", "Cover letter", "Downloads"]
     if changes_md:
         tabs_fixed.append("What changed")
-    tabs_fixed += ["Insights"]  # removed "Be a better candidate"
+    tabs_fixed += ["Tips"]  # removed "Be a better candidate"
 
     st.session_state.setdefault("active_tab", "Updated résumé")
 
@@ -391,8 +391,9 @@ if tailored:
     elif active == "What changed" and changes_md:
         st.markdown(changes_md, unsafe_allow_html=False)
 
-    # --- Insights (+ button-triggered better-candidate call) ---
-    elif active == "Insights":
+    # --- Tips (+ button-triggered better-candidate call) ---
+    elif active == "Tips":
+        # We still use insights under the hood, but we only show the match bar and ATS line.
         try:
             if isinstance(insights, str):
                 insights = json.loads(insights)
@@ -400,15 +401,11 @@ if tailored:
             insights = {}
 
         score = int((insights or {}).get("match_score") or 0)
-        missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
-        st.markdown(f"**Match score:** {score}%")
+
+        st.markdown("**Match score**")
         st.progress(max(0, min(score, 100)) / 100.0)
-        if missing:
-            st.markdown("**Missing keywords**")
-            st.write("- " + "\n- ".join(html.escape(str(kw)) for kw in missing))
-        else:
-            st.markdown("**No critical keywords missing**")
+
         if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
             st.markdown("**ATS checks**")
             st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
@@ -448,7 +445,7 @@ if tailored:
                         "error": None,
                     }
                 except Exception as e:
-                    # No extra banner here; just keep quiet if it fails, per your preference
+                    # Silent failure per your preference; UI just won't render actions
                     cached_item = {"llm_ok": False, "actions": [], "error": str(e)}
                 cache[sig_src] = cached_item
                 st.session_state["better_actions_cache"] = cache
