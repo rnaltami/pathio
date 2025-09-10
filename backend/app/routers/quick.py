@@ -39,24 +39,89 @@ if _client is None and OPENAI_API_KEY:
 router = APIRouter()
 
 # ---------- Keyword filtering for Insights ----------
+# ---------- Keyword filtering for Insights (improved) ----------
 _STOPWORDS = {
-    # common
-    "the","and","for","with","from","this","that","your","you","are","our","their","its","but","not","all",
-    "able","must","will","have","has","had","can","may","should","would","could","as","of","to","in","on","by",
-    "an","a","at","be","is","it","or","we","they","he","she","them","us","i","me","my","mine","yours","his","her",
-    # job-post fluff
-    "position","role","team","department","responsibilities","requirements","preferred","qualifications",
-    "application","applications","candidate","candidates","materials","process","responsibility","summary",
-    "work","working","hours","availability","schedule","scheduling","training","onboarding","remote","onsite",
+    # common function words
+    "the","and","or","but","if","then","than","so","because","while","where","when",
+    "for","with","from","into","over","under","between","within","without","about","above","below","after",
+    "before","during","across","along","alongside","around","another",
+    "to","in","on","at","by","of","as","per","via","per",
+    "a","an","is","are","be","been","being","was","were","do","does","did","done","doing",
+    "have","has","had","having","can","could","may","might","must","should","would","will",
+    "this","that","these","those","such","same","other","each","every","any","all","some","most","more","many","few",
+    "it","its","itself","they","them","their","theirs","we","our","ours","you","your","yours","i","me","my","mine",
+    # job-post fluff / boilerplate
+    "position","role","team","department","responsibilities","requirements","preferred","qualifications","preference",
+    "materials","process","summary","including","include","includes","including",
+    "work","working","hours","availability","schedule","scheduling","remote","onsite","entirely",
+    "training","onboarding","week","weeks","day","days","month","months","year","years",
+    "applicant","applicants","candidates","candidate","staff","office","mission","values",
+    # edu context
+    "college","university","liberal","arts","education",
     # timezones / time words
-    "am","pm","cst","est","pst","mst","utc","mon","tue","wed","thu","thur","fri","sat","sun",
-    # school/context
-    "college","university","macalester","liberal","arts","education","values","mission","office",
+    "am","pm","cst","est","pst","mst","utc","monday","tuesday","wednesday","thursday","friday","saturday","sunday",
 }
 
-_ALPHA_TOKEN = re.compile(r"[A-Za-z][A-Za-z.+#-]{2,}")  # keep letters, allow + . # -
+_ALPHA_TOKEN = re.compile(r"[A-Za-z][A-Za-z.+#-]{2,}")  # keep letters; allow + . # -
 _TIMEY = re.compile(r"^\d{1,2}(:?\d{2})?(am|pm)?$", re.IGNORECASE)  # 9, 9am, 9:00, 9:00pm
 _NUMERICISH = re.compile(r"^[\d$.,%-]+$")  # money, percents, pure numbers
+
+def _singularize(tok: str) -> str:
+    """Ultra-light singularization to align 'admissions'~'admission', 'studies'~'study'."""
+    if len(tok) <= 3: 
+        return tok
+    if tok.endswith("ies") and len(tok) > 4:
+        return tok[:-3] + "y"
+    if tok.endswith("sses") or tok.endswith("shes") or tok.endswith("ches"):
+        return tok[:-2]  # classes->class (keep 'ss'), matches->match
+    if tok.endswith("es") and len(tok) > 4:
+        return tok[:-2]
+    if tok.endswith("s") and not tok.endswith("ss"):
+        return tok[:-1]
+    return tok
+
+def _tokset(text: str) -> set[str]:
+    """
+    Extract a deduped set of meaningful tokens:
+      - alphabetic (letters, may include + . # - inside)
+      - lowercased, lightly singularized
+      - length >= 3
+      - exclude stopwords and numeric/time-like tokens
+    """
+    out: set[str] = set()
+    if not text:
+        return out
+    s = (text or "").lower()
+    for raw in _ALPHA_TOKEN.findall(s):
+        tok = raw.strip(".+#-")
+        if len(tok) < 3:
+            continue
+        if _TIMEY.match(tok) or _NUMERICISH.match(tok):
+            continue
+        if any(ch.isdigit() for ch in tok):
+            continue
+        if tok in _STOPWORDS:
+            continue
+        tok = _singularize(tok)
+        if tok in _STOPWORDS or len(tok) < 3:
+            continue
+        out.add(tok)
+    return out
+
+def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str]]:
+    """
+    Simple overlap score + top missing keywords from the job using filtered tokens.
+    """
+    R = _tokset(resume_text)
+    J = _tokset(job_text)
+    if not J:
+        return 0, []
+
+    overlap = len(R & J)
+    score = int(round(100 * overlap / max(1, len(J))))
+    missing = sorted(J - R)[:cap]  # deterministic & readable
+
+    return max(0, min(100, score)), missing
 
 
 # =========================
@@ -175,20 +240,43 @@ def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[
     return max(0, min(100, score)), missing
 
 
-def _actions_from_missing(missing: list[str]) -> tuple[list[str], list[str]]:
-    if not missing:
-        return [], []
+def _actions_from_missing(missing: list[str], job_text: str = "") -> tuple[list[str], list[str]]:
+    """
+    Generate concrete 'do now' and 'do long' actions.
+    If the role looks like admissions/application reading, use domain-tailored tasks.
+    Otherwise, fall back to neutral actions referencing top missing keywords.
+    """
+    # Detect admissions/application-reader context
+    jt = (job_text or "").lower()
+    is_admissions = (
+        ("admission" in jt or "admissions" in jt) and
+        ("application" in jt or "evaluate" in jt or "reader" in jt)
+    )
+
     top = [w for w in missing if len(w) >= 3][:3]
     joined = ", ".join(top) if top else "key requirements"
-    do_now = [
-        f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
-        "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
-        "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)",
-    ]
-    do_long = [
-        "Turn one artifact into a portfolio piece with a clear README and trade-offs. (time ~1–2 wks)",
-        "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)",
-    ]
+
+    if is_admissions:
+        do_now = [
+            "Skim 3–5 sample applications and practice writing 120–180-word narrative summaries using a consistent structure (context → academics → activities → contribution potential).",
+            "Draft a one-page rubric for evaluating curriculum rigor, academic performance, extracurricular impact, and community contribution; test it on one sample.",
+            "Set up a secure, organized workspace (folders, naming) and log template to ensure confidential handling and timely completion.",
+        ]
+        do_long = [
+            "Build a 3–4 page 'reader handbook' for yourself: common patterns, red flags, and exemplar narratives tailored to selective liberal arts contexts.",
+            "Complete a self-paced practice sprint: 10 timed reads (20–25 min each), track pace and accuracy, and iterate your rubric once.",
+        ]
+    else:
+        # neutral fallback referencing actual missing keywords
+        do_now = [
+            f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
+            "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
+            "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)",
+        ]
+        do_long = [
+            "Turn one artifact into a portfolio piece with a clear README and trade-offs. (time ~1–2 wks)",
+            "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)",
+        ]
     return do_now, do_long
 
 
@@ -273,7 +361,7 @@ def quick_tailor(req: QuickTailorRequest):
 
     # Safe, non-fabricating insights (always computed)
     score, missing = _match_and_missing(resume_text, job_text)
-    do_now, do_long = _actions_from_missing(missing)
+    do_now, do_long = _actions_from_missing(missing, job_text=job_text)
 
     # Return a consistent payload whether LLM worked or not
     return {
