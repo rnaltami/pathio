@@ -330,10 +330,10 @@ if tailored:
 
     st.session_state.setdefault("active_tab", "Updated résumé")
 
-    # Prefer segmented control; fall back to radio if not available
-    if st.session_state.get("stay_on"):
-     st.session_state["active_tab"] = st.session_state["stay_on"]
-    del st.session_state["stay_on"]
+    # Honor a requested tab before the selector is created (safe pop)
+    _stay = st.session_state.pop("stay_on", None)
+    if _stay:
+     st.session_state["active_tab"] = _stay
 
     try:
         active = st.segmented_control("Sections", options=tabs_fixed, key="active_tab", label_visibility="collapsed")
