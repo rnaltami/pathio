@@ -87,17 +87,20 @@ if qp.get("view") == "future":
 # =========================
 st.set_page_config(page_title="Pathio", page_icon="pathio-logo.png", layout="centered")
 
-# Hide Streamlit chrome (may flash briefly on first paint — normal)
-st.markdown(
-    """
-    <style>
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-      header {visibility: hidden;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
+# --- Hide Streamlit chrome & running banners (stable testids) ---
+st.markdown("""
+<style>
+  /* Top-right toolbar (rerun/stop/running icon) */
+  [data-testid="stToolbar"] { display: none !important; }
+  /* Deploy button */
+  [data-testid="stDeployButton"] { display: none !important; }
+  /* Connection/status widgets that flash during reruns */
+  [data-testid="stStatusWidget"],
+  [data-testid="stConnectionStatus"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 
 # ---------- Style (restore your previous look) ----------
 st.markdown(
@@ -238,12 +241,16 @@ def prefetch_exports(resume_md: str, cover_md: str):
     else:       st.session_state["cover_docx"] = cov_bytes
 
 # ---------- Inputs (no disabled controls) ----------
-st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
-st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
-st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
-st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
+with st.form("pathio_form", clear_on_submit=False):
+    st.markdown("<div class='step-row'><div class='step-badge'>1</div><div class='step-title'>Start with the job you want</div><div class='step-hint'>Paste job description.</div></div>", unsafe_allow_html=True)
+    st.text_area("Job description input", key="pasted_job", height=140, label_visibility="collapsed")
 
-if st.button("Go", key="cta"):
+    st.markdown("<div class='step-row'><div class='step-badge'>2</div><div class='step-title'>Paste your résumé</div></div>", unsafe_allow_html=True)
+    st.text_area("Résumé input", key="pasted_resume", height=160, label_visibility="collapsed")
+
+    submitted = st.form_submit_button("Go", use_container_width=True)
+
+if submitted:
     resume_txt = (st.session_state.get("pasted_resume") or "").strip()
     job_txt = (st.session_state.get("pasted_job") or "").strip()
     if not resume_txt or not job_txt:
@@ -272,8 +279,6 @@ if st.button("Go", key="cta"):
                             "what_changed_md": data.get("what_changed_md", ""),
                         }
                         st.session_state["insights"] = data.get("insights", {})
-                        st.session_state["llm_ok"] = bool(data.get("llm_ok", True))
-                        st.session_state["llm_error"] = data.get("error")
                         # Prefetch downloads
                         try:
                             prefetch_exports(
@@ -291,6 +296,7 @@ if st.button("Go", key="cta"):
                 st.error(f"Update failed. {e}")
             finally:
                 st.session_state["busy"] = False
+
 
 # ---------- Results ----------
 tailored = st.session_state.get("tailored")

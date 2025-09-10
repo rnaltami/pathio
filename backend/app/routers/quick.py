@@ -38,6 +38,27 @@ if _client is None and OPENAI_API_KEY:
 
 router = APIRouter()
 
+# ---------- Keyword filtering for Insights ----------
+_STOPWORDS = {
+    # common
+    "the","and","for","with","from","this","that","your","you","are","our","their","its","but","not","all",
+    "able","must","will","have","has","had","can","may","should","would","could","as","of","to","in","on","by",
+    "an","a","at","be","is","it","or","we","they","he","she","them","us","i","me","my","mine","yours","his","her",
+    # job-post fluff
+    "position","role","team","department","responsibilities","requirements","preferred","qualifications",
+    "application","applications","candidate","candidates","materials","process","responsibility","summary",
+    "work","working","hours","availability","schedule","scheduling","training","onboarding","remote","onsite",
+    # timezones / time words
+    "am","pm","cst","est","pst","mst","utc","mon","tue","wed","thu","thur","fri","sat","sun",
+    # school/context
+    "college","university","macalester","liberal","arts","education","values","mission","office",
+}
+
+_ALPHA_TOKEN = re.compile(r"[A-Za-z][A-Za-z.+#-]{2,}")  # keep letters, allow + . # -
+_TIMEY = re.compile(r"^\d{1,2}(:?\d{2})?(am|pm)?$", re.IGNORECASE)  # 9, 9am, 9:00, 9:00pm
+_NUMERICISH = re.compile(r"^[\d$.,%-]+$")  # money, percents, pure numbers
+
+
 # =========================
 # Models
 # =========================
@@ -52,6 +73,26 @@ class ChatRequest(BaseModel):
 # =========================
 # Helpers
 # =========================
+import difflib
+
+def _heuristic_changes(before: str, after: str, cap: int = 6) -> list[str]:
+    """
+    Compute a simple line-based diff between before and after resumes.
+    Returns up to `cap` bullet strings like 'Removed X', 'Added Y'.
+    """
+    before_lines = [ln.strip() for ln in before.splitlines() if ln.strip()]
+    after_lines = [ln.strip() for ln in after.splitlines() if ln.strip()]
+    diff = list(difflib.ndiff(before_lines, after_lines))
+    changes = []
+    for d in diff:
+        if d.startswith("- "):
+            changes.append(f"Removed: {d[2:]}")
+        elif d.startswith("+ "):
+            changes.append(f"Added: {d[2:]}")
+        if len(changes) >= cap:
+            break
+    return changes
+
 def _nfkc(s: str) -> str:
     if not s:
         return ""
@@ -86,24 +127,61 @@ def _chat(messages: List[Dict[str, str]], max_tokens: int = 1600, temperature: f
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+#-]{1,}")
 
 def _tokset(text: str) -> set[str]:
-    return set(_TOKEN.findall((text or "").lower()))
+    """
+    Extract a deduped set of meaningful tokens:
+    - alphabetic (letters, may include + . # - inside)
+    - length >= 3
+    - exclude stopwords
+    - exclude numeric/time-like tokens (e.g., 9am, 20.40, 14-28)
+    """
+    out: set[str] = set()
+    if not text:
+        return out
+
+    # normalize
+    s = (text or "").lower()
+
+    # find candidate tokens
+    for raw in _ALPHA_TOKEN.findall(s):
+        tok = raw.strip(".+#-")  # trim punctuation-ish suffix/prefix
+        if len(tok) < 3:
+            continue
+        if _TIMEY.match(tok) or _NUMERICISH.match(tok):
+            continue
+        if any(ch.isdigit() for ch in tok):
+            continue
+        if tok in _STOPWORDS:
+            continue
+        out.add(tok)
+    return out
+
 
 def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str]]:
+    """
+    Compute a simple overlap score + top missing keywords from the job.
+    Only considers filtered tokens (see _tokset).
+    """
     R = _tokset(resume_text)
     J = _tokset(job_text)
     if not J:
         return 0, []
+
     overlap = len(R & J)
-    score = int(round(100 * overlap / len(J)))
-    missing = [w for w in sorted(J - R) if len(w) >= 3][:cap]
+    score = int(round(100 * overlap / max(1, len(J))))
+    # rank missing by a simple heuristic: alphabetical but you could later plug TF weights
+    missing = sorted(J - R)[:cap]
+
+    # clamp 0..100
     return max(0, min(100, score)), missing
+
 
 def _actions_from_missing(missing: list[str]) -> tuple[list[str], list[str]]:
     if not missing:
         return [], []
-    top = missing[:3]
+    top = [w for w in missing if len(w) >= 3][:3]
+    joined = ", ".join(top) if top else "key requirements"
     do_now = [
-        f"Draft a 1-page alignment sheet mapping your bullets to {', '.join(top)}. (time ~1–2h)",
+        f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
         "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
         "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)",
     ]
@@ -112,6 +190,7 @@ def _actions_from_missing(missing: list[str]) -> tuple[list[str], list[str]]:
         "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)",
     ]
     return do_now, do_long
+
 
 # =========================
 # Tailoring (STRICT)
@@ -125,11 +204,14 @@ def call_llm_tailor(resume_text: str, job_text: str) -> Tuple[str, str, str]:
         return "", "", ""
 
     system = (
-        "You are an expert resume editor.\n"
-        "- REWRITE ONLY WHAT EXISTS in the source resume; do not invent tools, metrics, or achievements.\n"
-        "- Keep it factual, concise, and ATS-friendly.\n"
-        "- Use Markdown. No code fences.\n"
+    "You are an expert resume editor.\n"
+    "- REWRITE ONLY WHAT EXISTS in the source resume; do not invent tools, metrics, or achievements.\n"
+    "- Keep it factual, concise, and ATS-friendly.\n"
+    "- Use Markdown. No code fences.\n"
+    "- When listing 'What changed', refer to specific bullets/sections that were modified, added, or removed.\n"
+    "- Example: 'Condensed 3 script coordinator bullets into 2 clearer lines' or 'Removed unrelated casting director details'.\n"
     )
+
     # IMPORTANT: force a Summary header at the very top (grounded, ≤3 lines)
     user = (
         f"JOB DESCRIPTION:\n{job_text}\n\n"
@@ -183,6 +265,11 @@ def quick_tailor(req: QuickTailorRequest):
 
     tailored_md, cover_md, what_changed_md = call_llm_tailor(resume_text, job_text)
     llm_ok = bool(tailored_md and cover_md)
+   
+    if not what_changed_md and llm_ok:
+    # fallback: generate concrete changes via diff
+     changes = _heuristic_changes(resume_text, tailored_md)
+     what_changed_md = "\n".join(f"- {c}" for c in changes)
 
     # Safe, non-fabricating insights (always computed)
     score, missing = _match_and_missing(resume_text, job_text)
