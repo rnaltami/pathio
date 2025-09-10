@@ -273,6 +273,7 @@ if submitted:
                     else:
                         r.raise_for_status()
                         data = r.json()
+                        st.session_state["llm_ok"] = bool(data.get("llm_ok", True))
                         st.session_state["tailored"] = {
                             "tailored_resume_md": data.get("tailored_resume_md", ""),
                             "cover_letter_md": data.get("cover_letter_md", ""),
@@ -290,6 +291,7 @@ if submitted:
                             st.session_state["cover_export_error"] = f"{e}"
                         # Land user on first results tab
                         st.session_state["active_tab"] = "Updated résumé"
+                        st.session_state["better_actions_cache"] = {}
             except requests.exceptions.HTTPError as e:
                 st.error(f"Update failed ({e.response.status_code}). Please try again.")
             except Exception as e:
@@ -303,7 +305,7 @@ tailored = st.session_state.get("tailored")
 insights = st.session_state.get("insights")
 
 if tailored:
-     # LLM failure banner (visible even with .stAlert hidden)
+    # LLM failure banner (visible even with .stAlert hidden)
     if not st.session_state.get("llm_ok", True):
         st.markdown(
             """
@@ -314,37 +316,39 @@ if tailored:
             """,
             unsafe_allow_html=True,
         )
+
     resume_md_full = tailored.get("tailored_resume_md", "") or ""
     changes_md = (tailored.get("what_changed_md") or "").strip() or None
     summary_md, body_md = split_summary(resume_md_full)
     cover_md = tailored.get("cover_letter_md", "") or ""
 
-    # Build tab list and reorder so the active tab renders first (prevents snap-back after reruns)
-    base_tabs = ["Updated résumé", "Cover letter", "Downloads"]
+    # Fixed-order "tabs" via a selector (no swapping)
+    tabs_fixed = ["Updated résumé", "Cover letter", "Downloads"]
     if changes_md:
-        base_tabs.append("What changed")
-    base_tabs += ["Insights", "Be a better candidate"]
+        tabs_fixed.append("What changed")
+    tabs_fixed += ["Insights"]  # removed "Be a better candidate"
 
-    active = st.session_state.get("active_tab", "Updated résumé")
-    ordered = [active] + [t for t in base_tabs if t != active]
-    tab_objs = st.tabs(ordered)
+    st.session_state.setdefault("active_tab", "Updated résumé")
 
-    # Make a name -> tab object map
-    tab_map = {name: tab_objs[i] for i, name in enumerate(ordered)}
+    # Prefer segmented control; fall back to radio if not available
+    try:
+        active = st.segmented_control("Sections", options=tabs_fixed, key="active_tab", label_visibility="collapsed")
+    except Exception:
+        active = st.radio("Sections", tabs_fixed, horizontal=True, key="active_tab", label_visibility="collapsed")
 
-    # Updated résumé
-    with tab_map["Updated résumé"]:
+    # --- Updated résumé ---
+    if active == "Updated résumé":
         if summary_md:
             st.markdown(summary_md)   # summary above the body
             st.markdown("")           # small spacer
         st.markdown(body_md if body_md else resume_md_full, unsafe_allow_html=False)
 
-    # Cover letter
-    with tab_map["Cover letter"]:
+    # --- Cover letter ---
+    elif active == "Cover letter":
         st.markdown(cover_md, unsafe_allow_html=False)
 
-    # Downloads (prefetched; instant buttons). Stay on this tab by keeping active_tab unchanged.
-    with tab_map["Downloads"]:
+    # --- Downloads (prefetched; instant buttons) ---
+    elif active == "Downloads":
         resume_blob = st.session_state.get("resume_docx")
         cover_blob = st.session_state.get("cover_docx")
         res_err = st.session_state.get("resume_export_error")
@@ -361,7 +365,7 @@ if tailored:
                 key="dl_resume",
             ):
                 st.session_state["active_tab"] = "Downloads"
-                st.rerun()  # <- add this line
+                st.rerun()
         if res_err and resume_blob is None:
             st.caption(f"Export issue: {res_err}")
 
@@ -375,23 +379,22 @@ if tailored:
                 key="dl_cover",
             ):
                 st.session_state["active_tab"] = "Downloads"
-                st.rerun()  # <- add this line
-        
+                st.rerun()
         if cov_err and cover_blob is None:
             st.caption(f"Export issue: {cov_err}")
 
-    # What changed
-    if changes_md:
-        with tab_map["What changed"]:
-            st.markdown(changes_md, unsafe_allow_html=False)
+    # --- What changed ---
+    elif active == "What changed" and changes_md:
+        st.markdown(changes_md, unsafe_allow_html=False)
 
-    # Insights
-    with tab_map["Insights"]:
+    # --- Insights (+ button-triggered better-candidate call) ---
+    elif active == "Insights":
         try:
             if isinstance(insights, str):
                 insights = json.loads(insights)
         except Exception:
             insights = {}
+
         score = int((insights or {}).get("match_score") or 0)
         missing = list((insights or {}).get("missing_keywords") or [])
         flags = list((insights or {}).get("ats_flags") or [])
@@ -408,25 +411,55 @@ if tailored:
         else:
             st.markdown("**Passed automated parsing checks (ATS).**")
 
-    # Be a better candidate
-    with tab_map["Be a better candidate"]:
-        try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
-        except Exception:
-            insights = {}
-        do_now = list((insights or {}).get("do_now") or [])
-        do_long = list((insights or {}).get("do_long") or [])
-        if not (do_now or do_long):
-            st.markdown("_No action suggestions available yet._")
-        else:
-            if do_now:
-                st.markdown("**Do these now**")
-                for text in do_now:
-                    href = f"?view=chat&prompt={quote(str(text))}"
-                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
-            if do_long:
-                st.markdown("**Do these long term**")
-                for text in do_long:
-                    href = f"?view=chat&prompt={quote(str(text))}"
-                    st.markdown(f"- {html.escape(str(text))} — [Show me how]({href})")
+        # ---------- Better Candidate (Phase 1: button-triggered second call) ----------
+        # Cache key for current resume+job input
+        sig_src = hashlib.md5(((st.session_state.get("pasted_resume") or "") + "||" +
+                              (st.session_state.get("pasted_job") or "")).encode("utf-8")).hexdigest()
+        st.session_state.setdefault("better_actions_cache", {})
+        cache = st.session_state["better_actions_cache"]
+        cached_item = cache.get(sig_src)  # shape: {"llm_ok": bool, "actions": [...], "error": str|None}
+
+        st.markdown("---")
+        st.markdown("#### Want to be a stronger candidate?")
+
+        col_btn, col_hint = st.columns([1, 3])
+        with col_btn:
+            fetch = st.button("Get personalized candidate tips", key="btn_better_candidate")
+        with col_hint:
+            st.caption("Concrete, role-specific steps you can do in the next few weeks.")
+
+        if fetch:
+            with st.spinner("Finding concrete, role-specific steps…"):
+                try:
+                    payload = {
+                        "resume_text": st.session_state.get("pasted_resume") or "",
+                        "job_text": st.session_state.get("pasted_job") or "",
+                    }
+                    r = requests.post(f"{backend_url}/better-candidate", json=payload, timeout=90)
+                    r.raise_for_status()
+                    data = r.json()
+                    cached_item = {
+                        "llm_ok": bool(data.get("llm_ok")),
+                        "actions": data.get("actions") or [],
+                        "error": None,
+                    }
+                except Exception as e:
+                    # No extra banner here; just keep quiet if it fails, per your preference
+                    cached_item = {"llm_ok": False, "actions": [], "error": str(e)}
+                cache[sig_src] = cached_item
+                st.session_state["better_actions_cache"] = cache
+                st.rerun()  # repaint to show actions immediately
+
+        # Render actions if present (silent if none / API failed)
+        if cached_item and cached_item.get("actions"):
+            st.markdown("**Do these now**")
+            for a in cached_item["actions"]:
+                title = (a.get("title") or "").strip()
+                why = (a.get("why") or "").strip()
+                steps = a.get("steps") or []
+                href = f"?view=chat&prompt={quote(title)}"
+                st.markdown(f"- {html.escape(title)} — [Show me how]({href})")
+                if why:
+                    st.caption(why)
+                if steps:
+                    st.markdown("  " + "\n  ".join(f"- {html.escape(str(s))}" for s in steps))

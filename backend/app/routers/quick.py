@@ -5,6 +5,7 @@ import os
 import re
 import json
 import unicodedata
+import difflib
 from typing import List, Dict, Any, Tuple, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -38,41 +39,65 @@ if _client is None and OPENAI_API_KEY:
 
 router = APIRouter()
 
-# ---------- Keyword filtering for Insights (improved) ----------
-_STOPWORDS = {
-    # common function words
-    "the","and","or","but","if","then","than","so","because","while","where","when",
-    "for","with","from","into","over","under","between","within","without","about","above","below","after",
-    "before","during","across","along","alongside","around","another",
-    "to","in","on","at","by","of","as","per","via","per",
-    "a","an","is","are","be","been","being","was","were","do","does","did","done","doing",
-    "have","has","had","having","can","could","may","might","must","should","would","will",
-    "this","that","these","those","such","same","other","each","every","any","all","some","most","more","many","few",
-    "it","its","itself","they","them","their","theirs","we","our","ours","you","your","yours","i","me","my","mine",
-    # job-post fluff / boilerplate
-    "position","role","team","department","responsibilities","requirements","preferred","qualifications","preference",
-    "materials","process","summary","including","include","includes","including",
-    "work","working","hours","availability","schedule","scheduling","remote","onsite","entirely",
-    "training","onboarding","week","weeks","day","days","month","months","year","years",
-    "applicant","applicants","candidates","candidate","staff","office","mission","values",
-    # edu context
-    "college","university","liberal","arts","education",
-    # timezones / time words
-    "am","pm","cst","est","pst","mst","utc","monday","tuesday","wednesday","thursday","friday","saturday","sunday",
+# =========================
+# Stopwords & tokenization
+# =========================
+BASE_STOPWORDS = {
+    "i","me","my","myself","we","our","ours","ourselves","you","your","yours","yourself","yourselves",
+    "he","him","his","himself","she","her","hers","herself","it","its","itself","they","them","their",
+    "theirs","themselves","what","which","who","whom","this","that","these","those","am","is","are",
+    "was","were","be","been","being","have","has","had","having","do","does","did","doing","a","an",
+    "the","and","but","if","or","because","as","until","while","of","at","by","for","with","about",
+    "against","between","into","through","during","before","after","above","below","to","from","up",
+    "down","in","out","on","off","over","under","again","further","then","once","here","there","when",
+    "where","why","how","all","any","both","each","few","more","most","other","some","such","no",
+    "nor","not","only","own","same","so","than","too","very","s","t","can","will","just","don","should",
+    "now","also","via"
 }
 
-_ALPHA_TOKEN = re.compile(r"[A-Za-z][A-Za-z.+#-]{2,}")  # keep letters; allow + . # -
-_TIMEY = re.compile(r"^\d{1,2}(:?\d{2})?(am|pm)?$", re.IGNORECASE)  # 9, 9am, 9:00, 9:00pm
-_NUMERICISH = re.compile(r"^[\d$.,%-]+$")  # money, percents, pure numbers
+JOB_POST_STOPWORDS = {
+    "role","position","job","team","department","organization","company","employer","employee","candidate","candidates",
+    "applicant","applicants","application","applications","apply","applying","hiring","recruit","recruiting","recruitment",
+    "responsibility","responsibilities","requirement","requirements","qualification","qualifications","preferred",
+    "preference","skills","experience","experiences","background","overview","summary","description","about","benefits",
+    "perk","perks","salary","compensation","range","hourly","deadline","guideline","guidelines","consideration",
+    "considered","consider","eligible","eligibility","opportunity","opportunities","equal","visa","sponsorship",
+    "remote","onsite","hybrid","full-time","fulltime","part-time","parttime","contract","internship","volunteer",
+    "available","availability","schedule","scheduling","shift","shifts","hours","hour","day","days","week","weeks","month","months","year","years",
+    "include","including","includes","inclusive","must","should","would","could","may","might","plus","etc",
+    "materials","documents","document","documentation","submit","submission","submissions","process","processes","procedures",
+    "preferred qualifications","preferred skills","nice to have","you will","you’ll","you will be","you are","we are","we’re",
+    "mission","values","culture","teamwork","collaboration","collaborate","work","working","workload","workflows",
+    "environment","office","offices","in-office","in office","on-site","on site","onboard","onboarding","train","training"
+}
+
+DATE_TIME_STOPWORDS = {
+    "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
+    "mon","tue","tues","wed","thu","thur","thurs","fri","sat","sun",
+    "january","february","march","april","may","june","july","august","september","october","november","december",
+    "jan","feb","mar","apr","jun","jul","aug","sep","sept","oct","nov","dec",
+    "am","pm","cst","est","pst","mst","utc","gmt","ct","pt","et","mt",
+    "today","tomorrow","yesterday"
+}
+
+PLATFORM_FLUFF_STOPWORDS = {
+    "social","media","platform","platforms","content","contents","online","digital","internet","web","website",
+    "trends","trend","audience","audiences","community","communities"
+}
+
+_STOPWORDS = BASE_STOPWORDS | JOB_POST_STOPWORDS | DATE_TIME_STOPWORDS | PLATFORM_FLUFF_STOPWORDS
+
+_ALPHA_TOKEN = re.compile(r"[A-Za-z][A-Za-z.+#-]{2,}")
+_TIMEY = re.compile(r"^\d{1,2}(:?\d{2})?(am|pm)?$", re.IGNORECASE)
+_NUMERICISH = re.compile(r"^[\d$.,%-]+$")
 
 def _singularize(tok: str) -> str:
-    """Ultra-light singularization to align 'admissions'~'admission', 'studies'~'study'."""
-    if len(tok) <= 3: 
+    if len(tok) <= 3:
         return tok
     if tok.endswith("ies") and len(tok) > 4:
         return tok[:-3] + "y"
-    if tok.endswith("sses") or tok.endswith("shes") or tok.endswith("ches"):
-        return tok[:-2]  # classes->class (keep 'ss'), matches->match
+    if tok.endswith(("sses","shes","ches")):
+        return tok[:-2]
     if tok.endswith("es") and len(tok) > 4:
         return tok[:-2]
     if tok.endswith("s") and not tok.endswith("ss"):
@@ -80,13 +105,6 @@ def _singularize(tok: str) -> str:
     return tok
 
 def _tokset(text: str) -> set[str]:
-    """
-    Extract a deduped set of meaningful tokens:
-      - alphabetic (letters, may include + . # - inside)
-      - lowercased, lightly singularized
-      - length >= 3
-      - exclude stopwords and numeric/time-like tokens
-    """
     out: set[str] = set()
     if not text:
         return out
@@ -107,135 +125,112 @@ def _tokset(text: str) -> set[str]:
         out.add(tok)
     return out
 
-def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str]]:
-    """
-    Simple overlap score + top missing keywords from the job using filtered tokens.
-    """
-    R = _tokset(resume_text)
-    J = _tokset(job_text)
-    if not J:
-        return 0, []
-
-    overlap = len(R & J)
-    score = int(round(100 * overlap / max(1, len(J))))
-    missing = sorted(J - R)[:cap]  # deterministic & readable
-
-    return max(0, min(100, score)), missing
-
-# ---------- JD -> required phrases extraction ----------
+# =========================
+# JD extraction & scoring
+# =========================
 _SECTION_HDRS = [
-    "qualifications", "preferred qualifications", "preferred qualifications include",
-    "it is expected", "responsibilities", "requirements", "what you'll do", "what you will do"
+    "qualifications","preferred qualifications","preferred skills",
+    "it is expected","responsibilities","requirements","what you'll do","what you will do",
+    "about you","about the role","skills","must have","nice to have","you have","you will"
 ]
+_HEADER_LINE = re.compile(r"^\s*[A-Z][A-Za-z0-9 &/’'()-]{2,}:\s*$")
 _BULLET = re.compile(r"^\s*[-*•]\s+(.*)$", re.IGNORECASE)
 
 def _clean_phrase(s: str) -> str:
     s = (s or "").strip()
-    s = re.sub(r"[()•·•–—]", " ", s)
-    s = re.sub(r"[:;.,]+$", "", s)           # trim trailing punctuation
+    s = re.sub(r"[()•·–—]", " ", s)
+    s = re.sub(r"[:;.,]+$", "", s)
     s = re.sub(r"\s{2,}", " ", s)
     s = s.lower()
-    # remove pure stopword phrases
     words = [w for w in re.findall(r"[a-zA-Z][a-zA-Z+#.-]*", s) if w not in _STOPWORDS]
     if not words:
         return ""
-    # very short filler words left? drop if meaningless
     if len(words) == 1 and words[0] in _STOPWORDS:
         return ""
     return " ".join(words)
 
+def _split_phrases(line: str) -> list[str]:
+    parts = re.split(r",|;| and | or ", (line or "").strip(), flags=re.IGNORECASE)
+    out: list[str] = []
+    for p in parts:
+        ph = _clean_phrase(p)
+        if ph and 1 <= len(ph.split()) <= 6:
+            out.append(ph)
+    return out
+
 def _extract_required_phrases(job_text: str) -> list[str]:
-    """
-    Pulls requirement-like bullets from JD sections:
-    - Qualifications / Preferred Qualifications / It is expected... / Responsibilities
-    Falls back to any bullet lines if those headers aren't found.
-    Returns ordered, deduped, cleaned short phrases (1–6 words).
-    """
     lines = (job_text or "").splitlines()
     phrases: list[str] = []
-    current = None
+    in_section = False
 
     def add_line(ln: str):
-        ph = _clean_phrase(ln)
-        if not ph:
-            return
-        # limit length to 1–6 words to keep phrases focused
-        if 1 <= len(ph.split()) <= 6:
+        for ph in _split_phrases(ln):
             phrases.append(ph)
 
-    # scan for sections
-    for i, ln in enumerate(lines):
-        l = ln.strip().lower()
-        if any(h in l for h in _SECTION_HDRS):
-            current = "section"
+    for ln in lines:
+        raw = ln.strip()
+        low = raw.lower()
+
+        # Start a known section?
+        if any(h in low for h in _SECTION_HDRS) or _HEADER_LINE.match(raw):
+            in_section = True
             continue
-        if current == "section":
+
+        # End of a section?
+        if in_section and (raw == "" or _HEADER_LINE.match(raw) or any(h in low for h in _SECTION_HDRS)):
+            in_section = any(h in low for h in _SECTION_HDRS) or bool(_HEADER_LINE.match(raw))
+            continue
+
+        if in_section:
             m = _BULLET.match(ln)
             if m:
                 add_line(m.group(1))
             else:
-                # end section when we hit a blank line or new header-ish line
-                if l == "" or re.match(r"^[A-Z][A-Za-z ]{2,}:?$", ln.strip()):
-                    current = None
+                add_line(raw)
 
-    # fallback to any bullets if nothing found
+    # Fallback: any bullets anywhere
     if not phrases:
         for ln in lines:
             m = _BULLET.match(ln)
             if m:
                 add_line(m.group(1))
 
-    # dedupe in order
-    seen = set()
-    out = []
+    # Dedupe, preserve order
+    seen, out = set(), []
     for p in phrases:
         if p not in seen:
             seen.add(p)
             out.append(p)
     return out
 
-# ---------- Résumé coverage vs phrases ----------
 def _resume_token_sets(resume_text: str) -> tuple[set[str], set[str]]:
-    """
-    Return (unigrams, bigrams) from resume for simple phrase coverage checks.
-    """
     toks = [t for t in re.findall(r"[a-zA-Z][a-zA-Z+#.-]*", (resume_text or "").lower())
             if t not in _STOPWORDS and len(t) >= 2 and not any(ch.isdigit() for ch in t)]
     unigrams = set(_singularize(t) for t in toks)
     bigrams = set()
     for a, b in zip(toks, toks[1:]):
         a, b = _singularize(a), _singularize(b)
-        if a in _STOPWORDS or b in _STOPWORDS: 
+        if a in _STOPWORDS or b in _STOPWORDS:
             continue
         bigrams.add(f"{a} {b}")
     return unigrams, bigrams
 
 def _covered(phrase: str, uni: set[str], bi: set[str]) -> bool:
-    """Phrase is covered if it's a bigram present OR all its unigrams appear."""
     words = phrase.split()
     if len(words) >= 2 and phrase in bi:
         return True
     return all(_singularize(w) in uni for w in words)
 
 def _score_and_missing_from_required(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str], list[str]]:
-    """
-    Compute coverage against extracted required phrases.
-    Returns (score%, missing_phrases, used_phrases).
-    """
     reqs = _extract_required_phrases(job_text)
     uni, bi = _resume_token_sets(resume_text)
     if not reqs:
         return 0, [], []
-
     used, missing = [], []
     for p in reqs:
-        if _covered(p, uni, bi):
-            used.append(p)
-        else:
-            missing.append(p)
+        (used if _covered(p, uni, bi) else missing).append(p)
     score = int(round(100 * len(used) / max(1, len(reqs))))
     return max(0, min(100, score)), missing[:cap], used
-
 
 # =========================
 # Models
@@ -248,29 +243,13 @@ class QuickTailorRequest(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[Dict[str, str]]
 
+class BetterCandidateRequest(BaseModel):
+    resume_text: str
+    job_text: str
+
 # =========================
 # Helpers
 # =========================
-import difflib
-
-def _heuristic_changes(before: str, after: str, cap: int = 6) -> list[str]:
-    """
-    Compute a simple line-based diff between before and after resumes.
-    Returns up to `cap` bullet strings like 'Removed X', 'Added Y'.
-    """
-    before_lines = [ln.strip() for ln in before.splitlines() if ln.strip()]
-    after_lines = [ln.strip() for ln in after.splitlines() if ln.strip()]
-    diff = list(difflib.ndiff(before_lines, after_lines))
-    changes = []
-    for d in diff:
-        if d.startswith("- "):
-            changes.append(f"Removed: {d[2:]}")
-        elif d.startswith("+ "):
-            changes.append(f"Added: {d[2:]}")
-        if len(changes) >= cap:
-            break
-    return changes
-
 def _nfkc(s: str) -> str:
     if not s:
         return ""
@@ -301,86 +280,68 @@ def _chat(messages: List[Dict[str, str]], max_tokens: int = 1600, temperature: f
     except Exception:
         return None
 
-# ---------- Insights (safe, non-fabricating) ----------
-_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+#-]{1,}")
+def _heuristic_changes(before: str, after: str, cap: int = 6) -> list[str]:
+    before_lines = [ln.strip() for ln in before.splitlines() if ln.strip()]
+    after_lines = [ln.strip() for ln in after.splitlines() if ln.strip()]
+    diff = list(difflib.ndiff(before_lines, after_lines))
+    changes = []
+    for d in diff:
+        if d.startswith("- "):
+            changes.append(f"Removed: {d[2:]}")
+        elif d.startswith("+ "):
+            changes.append(f"Added: {d[2:]}")
+        if len(changes) >= cap:
+            break
+    return changes
 
-def _tokset(text: str) -> set[str]:
-    """
-    Extract a deduped set of meaningful tokens:
-    - alphabetic (letters, may include + . # - inside)
-    - length >= 3
-    - exclude stopwords
-    - exclude numeric/time-like tokens (e.g., 9am, 20.40, 14-28)
-    """
-    out: set[str] = set()
+# ---- Better-candidate (on-demand LLM) ----
+def _coerce_actions_json(text: str) -> list[dict]:
     if not text:
-        return out
-
-    # normalize
-    s = (text or "").lower()
-
-    # find candidate tokens
-    for raw in _ALPHA_TOKEN.findall(s):
-        tok = raw.strip(".+#-")  # trim punctuation-ish suffix/prefix
-        if len(tok) < 3:
-            continue
-        if _TIMEY.match(tok) or _NUMERICISH.match(tok):
-            continue
-        if any(ch.isdigit() for ch in tok):
-            continue
-        if tok in _STOPWORDS:
-            continue
-        out.add(tok)
+        return []
+    s = text.strip()
+    m = re.search(r"```json\s*(\{.*?}|\[.*?])\s*```", s, flags=re.DOTALL | re.IGNORECASE)
+    if m:
+        s = m.group(1).strip()
+    try:
+        obj = json.loads(s)
+        if isinstance(obj, list):
+            out = []
+            for it in obj:
+                if isinstance(it, dict):
+                    title = (it.get("title") or "").strip()
+                    why = (it.get("why") or "").strip()
+                    steps = it.get("steps") or []
+                    if title:
+                        out.append({"title": title, "why": why, "steps": steps if isinstance(steps, list) else []})
+            return out
+    except Exception:
+        pass
+    lines = [ln.strip("-• ").strip() for ln in s.splitlines() if ln.strip()]
+    out = []
+    for ln in lines[:5]:
+        out.append({"title": ln, "why": "", "steps": []})
     return out
 
-
-def _match_and_missing(resume_text: str, job_text: str, cap: int = 12) -> tuple[int, list[str]]:
-    """
-    Compute a simple overlap score + top missing keywords from the job.
-    Only considers filtered tokens (see _tokset).
-    """
-    R = _tokset(resume_text)
-    J = _tokset(job_text)
-    if not J:
-        return 0, []
-
-    overlap = len(R & J)
-    score = int(round(100 * overlap / max(1, len(J))))
-    # rank missing by a simple heuristic: alphabetical but you could later plug TF weights
-    missing = sorted(J - R)[:cap]
-
-    # clamp 0..100
-    return max(0, min(100, score)), missing
-
-
-def _actions_from_missing(missing: list[str], job_text: str = "") -> tuple[list[str], list[str]]:
-    jt = (job_text or "").lower()
-    is_admissions = (("admission" in jt or "admissions" in jt) and ("application" in jt or "evaluate" in jt or "reader" in jt))
-    top = [w for w in missing if len(w.split()) >= 1][:3]
-    joined = ", ".join(top) if top else "key criteria"
-
-    if is_admissions:
-        do_now = [
-            "Complete a quick FERPA refresher and write a 5-bullet checklist for confidential handling.",
-            "Practice 3 narrative summaries (120–180 words each) using a structured template: context → academics → activities → contribution potential.",
-            "Draft a one-page rubric to rate curriculum rigor, academic performance, extracurricular impact, and community fit; test it on one sample file."
-        ]
-        do_long = [
-            "Run a timed reading sprint of 10 sample files (20–25 minutes each). Track pace + quality, then iterate your rubric once.",
-            "Create a 3–4 page 'reader handbook' with exemplar narratives, common patterns, and edge cases relevant to selective liberal-arts contexts."
-        ]
-    else:
-        do_now = [
-            f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
-            "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
-            "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)"
-        ]
-        do_long = [
-            "Turn one artifact into a portfolio piece with a clear README and trade-offs. (time ~1–2 wks)",
-            "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)"
-        ]
-    return do_now, do_long
-
+def call_llm_better_candidate(resume_text: str, job_text: str) -> list[dict]:
+    if not _client or not OPENAI_API_KEY:
+        return []
+    system = (
+        "You are a career coach. Based ONLY on the job description and the source resume, "
+        "describe what top applicants for this role typically have that this resume lacks, "
+        "then propose 3–6 specific, practical actions the candidate can do in 1–6 weeks to build toward that skillset. "
+        "Actions must be concrete and practice-oriented (e.g., produce X artifact, complete Y exercise, ship Z demo). "
+        "Avoid fabrications and obscure providers; prefer widely recognized tools/platforms. "
+        "No generic platitudes like 'improve communication'. "
+        "Output ONLY JSON in this shape: "
+        "[{\"title\":\"...\",\"why\":\"...\",\"steps\":[\"...\",\"...\"]}, ...]"
+    )
+    user = f"JOB DESCRIPTION:\n{job_text}\n\nRESUME (verbatim):\n{resume_text}\n"
+    raw = _chat(
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        max_tokens=700,
+        temperature=0.3,
+    ) or ""
+    return _coerce_actions_json(raw)
 
 # =========================
 # Tailoring (STRICT)
@@ -394,15 +355,14 @@ def call_llm_tailor(resume_text: str, job_text: str) -> Tuple[str, str, str]:
         return "", "", ""
 
     system = (
-    "You are an expert resume editor.\n"
-    "- REWRITE ONLY WHAT EXISTS in the source resume; do not invent tools, metrics, or achievements.\n"
-    "- Keep it factual, concise, and ATS-friendly.\n"
-    "- Use Markdown. No code fences.\n"
-    "- When listing 'What changed', refer to specific bullets/sections that were modified, added, or removed.\n"
-    "- Example: 'Condensed 3 script coordinator bullets into 2 clearer lines' or 'Removed unrelated casting director details'.\n"
+        "You are an expert resume editor.\n"
+        "- REWRITE ONLY WHAT EXISTS in the source resume; do not invent tools, metrics, or achievements.\n"
+        "- Keep it factual, concise, and ATS-friendly.\n"
+        "- Use Markdown. No code fences.\n"
+        "- When listing 'What changed', refer to specific bullets/sections that were modified, added, or removed.\n"
+        "- Example: 'Condensed 3 script coordinator bullets into 2 clearer lines' or 'Removed unrelated casting director details'.\n"
     )
 
-    # IMPORTANT: force a Summary header at the very top (grounded, ≤3 lines)
     user = (
         f"JOB DESCRIPTION:\n{job_text}\n\n"
         f"RESUME (verbatim source):\n{resume_text}\n\n"
@@ -444,6 +404,49 @@ def call_llm_tailor(resume_text: str, job_text: str) -> Tuple[str, str, str]:
     return tail.strip(), cover.strip(), changed.strip()
 
 # =========================
+# Actions (heuristic fallback)
+# =========================
+def _actions_from_missing(missing: list[str], job_text: str = "") -> tuple[list[str], list[str]]:
+    jt = (job_text or "").lower()
+    is_admissions = (("admission" in jt or "admissions" in jt) and ("application" in jt or "evaluate" in jt or "reader" in jt))
+    is_video = ("video" in jt or "videograph" in jt or "producer" in jt or "premiere" in jt or "after effects" in jt)
+
+    top = [w for w in missing if len(w.split()) >= 1][:3]
+    joined = ", ".join(top) if top else "key criteria"
+
+    if is_video:
+        do_now = [
+            "Assemble a 60–90s vertical reel from existing footage; add captions, simple motion titles, and music; export in 9:16 and 16:9.",
+            "Shoot a 30–60s piece at a local event; stabilize, color-correct, mix levels, and add SRT captions.",
+            "Create two alt cuts of the same story (fast vs. slow pacing) to show range; deliver platform-appropriate hooks.",
+        ]
+        do_long = [
+            "Build a mini style guide: fonts, lower-thirds, captions, color pipeline, export presets (YouTube/IG/TikTok).",
+            "Produce a 2–3 min feature: storyboard → shoot → edit → grade → mix → captions → thumbnail; track KPIs.",
+        ]
+    elif is_admissions:
+        do_now = [
+            "Complete a quick FERPA refresher and write a 5-bullet checklist for confidential handling.",
+            "Practice 3 narrative summaries (120–180 words) using a template: context → academics → activities → contribution potential.",
+            "Draft a one-page rubric for curriculum rigor, academic performance, extracurricular impact, and community fit; test on one file.",
+        ]
+        do_long = [
+            "Run a timed reading sprint of 10 sample files (20–25 minutes each). Track pace/quality, iterate the rubric once.",
+            "Create a 3–4 page reader handbook with exemplar narratives, common patterns, and edge cases.",
+        ]
+    else:
+        do_now = [
+            f"Draft a 1-page alignment sheet mapping your bullets to {joined}. (time ~1–2h)",
+            "Create a small, truthful sample artifact (checklist/outline/process doc) based on your current experience. (time ~3–4h)",
+            "Write a short impact recap (before/after, scope, timing) from a past project. (time ~2–3h)",
+        ]
+        do_long = [
+            "Turn one artifact into a portfolio piece with a clear README and trade-offs. (time ~1–2 wks)",
+            "Iterate a workflow you already use and document the improvement. (time ~1–2 wks)",
+        ]
+    return do_now, do_long
+
+# =========================
 # Routes
 # =========================
 @router.post("/quick-tailor")
@@ -456,7 +459,7 @@ def quick_tailor(req: QuickTailorRequest):
     tailored_md, cover_md, what_changed_md = call_llm_tailor(resume_text, job_text)
     llm_ok = bool(tailored_md and cover_md)
 
-    # NEW: score against extracted required phrases
+    # Score against extracted required phrases
     score, missing, used = _score_and_missing_from_required(resume_text, job_text)
     do_now, do_long = _actions_from_missing(missing, job_text=job_text)
 
@@ -469,15 +472,13 @@ def quick_tailor(req: QuickTailorRequest):
         "insights": {
             "engine": "llm+heuristic" if llm_ok else "heuristic-only",
             "match_score": score,
-            "missing_keywords": missing,     # now real requirement phrases
-            "present_keywords": used,        # handy if you want to display covered items
+            "missing_keywords": missing,
+            "present_keywords": used,
             "ats_flags": ["none"],
             "do_now": do_now,
             "do_long": do_long,
         },
     }
-
-
 
 @router.post("/coach")
 def coach(req: ChatRequest):
@@ -485,3 +486,14 @@ def coach(req: ChatRequest):
     system = "You are a practical, concise how-to coach. Respond with focused, step-by-step instructions."
     raw = _chat([{"role": "system", "content": system}] + msgs, max_tokens=700, temperature=0.2) or ""
     return {"reply": raw.strip() or "Here’s a short, concrete plan:\n1) Define the goal\n2) Gather tools\n3) Execute\n4) Review\n"}
+
+@router.post("/better-candidate")
+def better_candidate(req: BetterCandidateRequest):
+    resume_text = _nfkc(req.resume_text or "")
+    job_text = _nfkc(req.job_text or "")
+    if not resume_text or not job_text:
+        raise HTTPException(status_code=400, detail="Both resume_text and job_text are required.")
+    actions = call_llm_better_candidate(resume_text, job_text)
+    if not actions:
+        return {"llm_ok": False, "actions": []}
+    return {"llm_ok": True, "actions": actions}
