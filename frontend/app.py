@@ -391,76 +391,59 @@ if tailored:
     elif active == "What changed" and changes_md:
         st.markdown(changes_md, unsafe_allow_html=False)
 
-    # --- Tips (+ button-triggered better-candidate call) ---
-    elif active == "Tips":
-        # We still use insights under the hood, but we only show the match bar and ATS line.
-        try:
-            if isinstance(insights, str):
-                insights = json.loads(insights)
-        except Exception:
-            insights = {}
+# --- Tips (+ button-triggered better-candidate call) ---
+elif active == "Tips":
+    try:
+        if isinstance(insights, str):
+            insights = json.loads(insights)
+    except Exception:
+        insights = {}
 
-        score = int((insights or {}).get("match_score") or 0)
-        flags = list((insights or {}).get("ats_flags") or [])
+    # ---------- Better Candidate (Phase 1: button-triggered second call) ----------
+    sig_src = hashlib.md5(((st.session_state.get("pasted_resume") or "") + "||" +
+                          (st.session_state.get("pasted_job") or "")).encode("utf-8")).hexdigest()
+    st.session_state.setdefault("better_actions_cache", {})
+    cache = st.session_state["better_actions_cache"]
+    cached_item = cache.get(sig_src)
 
-        st.markdown("**Match score**")
-        st.progress(max(0, min(score, 100)) / 100.0)
+    st.markdown("#### Want to be a stronger candidate?")
 
-        if flags and not (len(flags) == 1 and str(flags[0]).lower() == "none"):
-            st.markdown("**ATS checks**")
-            st.write("- " + "\n- ".join(html.escape(str(f)) for f in flags))
-        else:
-            st.markdown("**Passed automated parsing checks (ATS).**")
+    col_btn, col_hint = st.columns([1, 3])
+    with col_btn:
+        fetch = st.button("Get personalized candidate tips", key="btn_better_candidate")
+    with col_hint:
+        st.caption("Concrete, role-specific steps you can do in the next few weeks.")
 
-        # ---------- Better Candidate (Phase 1: button-triggered second call) ----------
-        # Cache key for current resume+job input
-        sig_src = hashlib.md5(((st.session_state.get("pasted_resume") or "") + "||" +
-                              (st.session_state.get("pasted_job") or "")).encode("utf-8")).hexdigest()
-        st.session_state.setdefault("better_actions_cache", {})
-        cache = st.session_state["better_actions_cache"]
-        cached_item = cache.get(sig_src)  # shape: {"llm_ok": bool, "actions": [...], "error": str|None}
+    if fetch:
+        with st.spinner("Finding concrete, role-specific steps…"):
+            try:
+                payload = {
+                    "resume_text": st.session_state.get("pasted_resume") or "",
+                    "job_text": st.session_state.get("pasted_job") or "",
+                }
+                r = requests.post(f"{backend_url}/better-candidate", json=payload, timeout=90)
+                r.raise_for_status()
+                data = r.json()
+                cached_item = {
+                    "llm_ok": bool(data.get("llm_ok")),
+                    "actions": data.get("actions") or [],
+                    "error": None,
+                }
+            except Exception as e:
+                cached_item = {"llm_ok": False, "actions": [], "error": str(e)}
+            cache[sig_src] = cached_item
+            st.session_state["better_actions_cache"] = cache
+            st.rerun()
 
-        st.markdown("---")
-        st.markdown("#### Want to be a stronger candidate?")
-
-        col_btn, col_hint = st.columns([1, 3])
-        with col_btn:
-            fetch = st.button("Get personalized candidate tips", key="btn_better_candidate")
-        with col_hint:
-            st.caption("Concrete, role-specific steps you can do in the next few weeks.")
-
-        if fetch:
-            with st.spinner("Finding concrete, role-specific steps…"):
-                try:
-                    payload = {
-                        "resume_text": st.session_state.get("pasted_resume") or "",
-                        "job_text": st.session_state.get("pasted_job") or "",
-                    }
-                    r = requests.post(f"{backend_url}/better-candidate", json=payload, timeout=90)
-                    r.raise_for_status()
-                    data = r.json()
-                    cached_item = {
-                        "llm_ok": bool(data.get("llm_ok")),
-                        "actions": data.get("actions") or [],
-                        "error": None,
-                    }
-                except Exception as e:
-                    # Silent failure per your preference; UI just won't render actions
-                    cached_item = {"llm_ok": False, "actions": [], "error": str(e)}
-                cache[sig_src] = cached_item
-                st.session_state["better_actions_cache"] = cache
-                st.rerun()  # repaint to show actions immediately
-
-        # Render actions if present (silent if none / API failed)
-        if cached_item and cached_item.get("actions"):
-            st.markdown("**Do these now**")
-            for a in cached_item["actions"]:
-                title = (a.get("title") or "").strip()
-                why = (a.get("why") or "").strip()
-                steps = a.get("steps") or []
-                href = f"?view=chat&prompt={quote(title)}"
-                st.markdown(f"- {html.escape(title)} — [Show me how]({href})")
-                if why:
-                    st.caption(why)
-                if steps:
-                    st.markdown("  " + "\n  ".join(f"- {html.escape(str(s))}" for s in steps))
+    if cached_item and cached_item.get("actions"):
+        st.markdown("**Do these now**")
+        for a in cached_item["actions"]:
+            title = (a.get("title") or "").strip()
+            why = (a.get("why") or "").strip()
+            steps = a.get("steps") or []
+            href = f"?view=chat&prompt={quote(title)}"
+            st.markdown(f"- {html.escape(title)} — [Show me how]({href})")
+            if why:
+                st.caption(why)
+            if steps:
+                st.markdown("  " + "\n  ".join(f"- {html.escape(str(s))}" for s in steps))
