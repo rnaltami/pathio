@@ -44,18 +44,13 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stStatusWidget"] {display: none;}
     
-    /* Global styles - LIGHT MODE */
+    /* Global styles - MINIMAL COLOR PALETTE */
     :root {
         --bg-primary: #FFFFFF;
-        --bg-secondary: #F8F9FA;
-        --bg-tertiary: #F1F3F5;
         --text-primary: #1A1A1A;
         --text-secondary: #6B6B6B;
-        --text-tertiary: #9CA3AF;
         --accent-primary: #3B82F6;
-        --accent-hover: #2563EB;
         --border-color: #E5E7EB;
-        --input-bg: #FFFFFF;
     }
     
     /* Override Streamlit's default background */
@@ -65,133 +60,121 @@ st.markdown("""
     }
     
     .block-container {
-        max-width: 900px;
-        padding-top: 3rem;
-        padding-bottom: 3rem;
+        max-width: 800px;
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
     }
     
-    /* Custom text styles */
+    /* Custom text styles - SCALED DOWN */
     h1, h2, h3, h4, h5, h6, p, span, div, label {
         color: var(--text-primary) !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
     
-    /* Header/Brand */
+    h1 { font-size: 1.5rem !important; margin: 0.5rem 0 !important; }
+    h2 { font-size: 1.25rem !important; margin: 0.5rem 0 !important; }
+    h3 { font-size: 1.1rem !important; margin: 0.4rem 0 !important; }
+    p { font-size: 0.9rem !important; margin: 0.3rem 0 !important; }
+    
+    /* Header/Brand - SMALLER */
     .pathio-header {
         text-align: center;
-        margin-bottom: 3rem;
+        margin-bottom: 1.5rem;
         animation: fadeIn 0.6s ease-in;
     }
     
     .pathio-logo {
-        font-size: 2.5rem;
+        font-size: 1.75rem;
         font-weight: 700;
         letter-spacing: -0.5px;
-        background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 0.5rem;
+        color: var(--accent-primary);
+        margin-bottom: 0.25rem;
     }
     
     .pathio-tagline {
-        font-size: 1.1rem;
+        font-size: 0.85rem;
         color: var(--text-secondary);
         font-weight: 400;
     }
     
-    /* Search box - Perplexity style */
-    .search-container {
-        position: relative;
-        margin: 2rem auto;
-        max-width: 700px;
-    }
-    
+    /* Inputs - SMALLER, CLEANER */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        background-color: var(--input-bg) !important;
+        background-color: var(--bg-primary) !important;
         border: 1px solid var(--border-color) !important;
-        border-radius: 12px !important;
+        border-radius: 8px !important;
         color: var(--text-primary) !important;
-        font-size: 1rem !important;
-        padding: 1rem 1.25rem !important;
-        transition: all 0.2s ease;
+        font-size: 0.9rem !important;
+        padding: 0.6rem 0.9rem !important;
+        transition: border-color 0.2s ease;
     }
     
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
         border-color: var(--accent-primary) !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
         outline: none !important;
     }
     
     .stTextInput > div > div > input::placeholder,
     .stTextArea > div > div > textarea::placeholder {
-        color: var(--text-tertiary) !important;
+        color: var(--text-secondary) !important;
+        opacity: 0.6;
     }
     
-    /* Buttons - clean and minimal */
+    /* Buttons - SMALLER, MINIMAL */
     .stButton > button {
         background-color: var(--accent-primary) !important;
         color: white !important;
         border: none !important;
-        border-radius: 8px !important;
-        padding: 0.6rem 1.5rem !important;
+        border-radius: 6px !important;
+        padding: 0.5rem 1rem !important;
         font-weight: 500 !important;
-        font-size: 0.95rem !important;
-        transition: all 0.2s ease !important;
+        font-size: 0.85rem !important;
+        transition: opacity 0.2s ease !important;
         cursor: pointer !important;
     }
     
     .stButton > button:hover {
-        background-color: var(--accent-hover) !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+        opacity: 0.9;
     }
     
-    /* Secondary button style */
-    .secondary-btn button {
-        background-color: var(--bg-tertiary) !important;
-        color: var(--text-primary) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-    
-    .secondary-btn button:hover {
-        background-color: var(--bg-secondary) !important;
-        transform: translateY(-1px);
-    }
-    
-    /* Cards/Containers */
+    /* Cards/Containers - COMPACT */
     .job-card {
         background-color: var(--bg-primary);
         border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: border-color 0.2s ease;
     }
     
     .job-card:hover {
         border-color: var(--accent-primary);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+    
+    .job-card h3 {
+        font-size: 0.95rem !important;
+        margin: 0 0 0.25rem 0 !important;
+    }
+    
+    .job-card p {
+        font-size: 0.8rem !important;
+        margin: 0.15rem 0 !important;
     }
     
     /* Chat messages */
     .stChatMessage {
-        background-color: var(--bg-secondary) !important;
         border: 1px solid var(--border-color) !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        margin-bottom: 1rem !important;
+        border-radius: 8px !important;
+        padding: 0.75rem !important;
+        margin-bottom: 0.5rem !important;
     }
     
-    /* Dividers */
+    /* Dividers - SUBTLE */
     hr {
         border: none;
         border-top: 1px solid var(--border-color);
-        margin: 2rem 0;
+        margin: 1rem 0;
     }
     
     /* Animations */
@@ -300,47 +283,39 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - clearer paths for different user needs"""
+    """Landing page - compact, all-in-one-screen design"""
     render_header()
     
-    # Path 1: Job Search
-    st.markdown("### 🔍 Explore Job Opportunities")
-    st.markdown("Search for jobs across multiple sources")
-    
+    # Main search - prominent
     search_query = st.text_input(
         "search",
-        placeholder="e.g., Marketing Manager, Software Engineer, Writer...",
+        placeholder="What job are you looking for? (e.g., Marketing Manager, Writer...)",
         label_visibility="collapsed",
         key="main_search"
     )
     
-    if st.button("Search Jobs", use_container_width=True, type="primary"):
-        if search_query:
-            st.session_state["search_query"] = search_query
-            st.session_state["current_step"] = "search"
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        if st.button("Search Jobs", use_container_width=True, type="primary"):
+            if search_query:
+                st.session_state["search_query"] = search_query
+                st.session_state["current_step"] = "search"
+                st.rerun()
+            else:
+                st.warning("Please enter a job title")
+    
+    # Compact alternative actions
+    st.markdown("<div style='margin: 1.5rem 0 0.5rem 0; font-size: 0.85rem; color: var(--text-secondary);'>Or:</div>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📋 I have a job listing", use_container_width=True):
+            st.session_state["current_step"] = "paste_job"
             st.rerun()
-        else:
-            st.warning("Please enter a job title or role")
-    
-    st.markdown("---")
-    
-    # Path 2: Already Have a Job
-    st.markdown("### 📋 Already Have a Job Listing?")
-    st.markdown("Get help tailoring your application")
-    
-    if st.button("Paste Job & Resume", use_container_width=True):
-        st.session_state["current_step"] = "paste_job"
-        st.rerun()
-    
-    st.markdown("---")
-    
-    # Path 3: Career Exploration
-    st.markdown("### 💬 Not Sure What to Pursue?")
-    st.markdown("Chat with our AI career coach")
-    
-    if st.button("Start Career Chat", use_container_width=True):
-        st.session_state["current_step"] = "chat"
-        st.rerun()
+    with col2:
+        if st.button("💬 Career guidance", use_container_width=True):
+            st.session_state["current_step"] = "chat"
+            st.rerun()
 
 def render_paste_job():
     """Direct job paste interface for users who already have a listing"""
@@ -393,48 +368,43 @@ def render_paste_job():
                 st.warning("Please paste both job listing and resume")
 
 def render_search_results():
-    """Display job search results"""
+    """Display job search results - COMPACT"""
     query = st.session_state.get("search_query", "")
     
-    # Header with back button
-    col1, col2 = st.columns([1, 5])
+    # Compact header
+    col1, col2 = st.columns([1, 6])
     with col1:
         if st.button("← Back"):
             st.session_state["current_step"] = "landing"
             st.rerun()
-    
-    st.markdown(f"### Results for: {query}")
+    with col2:
+        st.markdown(f"<div style='font-size: 0.95rem; padding-top: 0.3rem;'><strong>{query}</strong></div>", unsafe_allow_html=True)
     
     # Search results
-    with st.spinner("Finding jobs..."):
+    with st.spinner("Searching..."):
         results = search_jobs(query, st.session_state.get("user_resume"))
         
     if not results:
-        st.info("No jobs found. Try a different search term.")
+        st.info("No jobs found. Try a different search.")
         return
     
-    st.markdown(f"Found {len(results)} jobs")
+    st.markdown(f"<div style='font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0;'>{len(results)} jobs found</div>", unsafe_allow_html=True)
     
     for idx, job in enumerate(results):
         with st.container():
             st.markdown(f"""
                 <div class="job-card">
-                    <h3 style="margin:0 0 0.5rem 0; font-size: 1.25rem;">{job.get('title', 'Job Title')}</h3>
-                    <p style="margin:0; color: var(--text-secondary);">
+                    <h3>{job.get('title', 'Job Title')}</h3>
+                    <p style="color: var(--text-secondary);">
                         {job.get('company', 'Company')} • {job.get('location', 'Location')}
-                    </p>
-                    <p style="margin:0.5rem 0; color: var(--text-tertiary); font-size: 0.9rem;">
-                        Match: {job.get('match_score', 0)}%
                     </p>
                 </div>
             """, unsafe_allow_html=True)
             
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                if st.button("View Details", key=f"view_{idx}"):
-                    st.session_state["selected_job"] = job
-                    st.session_state["current_step"] = "job_detail"
-                    st.rerun()
+            if st.button("View", key=f"view_{idx}", use_container_width=False):
+                st.session_state["selected_job"] = job
+                st.session_state["current_step"] = "job_detail"
+                st.rerun()
 
 def render_career_chat():
     """Career exploration chat interface"""
