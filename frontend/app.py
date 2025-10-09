@@ -108,7 +108,7 @@ st.markdown("""
         font-weight: 400 !important;
     }
     
-    /* Inputs - WHITE BACKGROUND, NO RED BORDER */
+    /* Inputs - WHITE BACKGROUND, NO SHADOW */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
         background-color: #FFFFFF !important;
@@ -119,6 +119,14 @@ st.markdown("""
         font-weight: 400 !important;
         padding: 0.75rem 1rem !important;
         transition: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Remove shadow from input container */
+    .stTextInput > div,
+    .stTextInput > div > div {
+        box-shadow: none !important;
+        background: transparent !important;
     }
     
     /* Force no border change on ANY state */
@@ -384,7 +392,7 @@ def render_landing():
                 Actually, I need career guidance first →
             </a>
             <a href="?action=apply" style='color: var(--text-secondary); text-decoration: none; display: block;'>
-                I have a job I want to apply to, help me get it →
+                I already have a job listing I want to apply to, help me get it →
             </a>
         </div>
     """, unsafe_allow_html=True)
