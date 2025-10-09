@@ -153,15 +153,17 @@ st.markdown("""
         border-color: var(--text-primary) !important;
     }
     
-    /* Primary button style */
+    /* Primary button - SUBTLE TEXT STYLE */
     .stButton > button[kind="primary"] {
-        background-color: var(--text-primary) !important;
-        color: white !important;
+        background-color: transparent !important;
+        color: var(--text-primary) !important;
         border: 1px solid var(--text-primary) !important;
+        font-weight: 500 !important;
     }
     
     .stButton > button[kind="primary"]:hover {
-        opacity: 0.9;
+        background-color: var(--text-primary) !important;
+        color: white !important;
     }
     
     /* Cards/Containers - COMPACT */
@@ -199,10 +201,25 @@ st.markdown("""
         margin-right: auto !important;
     }
     
-    /* Chat input container */
+    /* Chat input - FORCE CONTAINED WIDTH */
     .stChatInputContainer {
         max-width: 680px !important;
         margin: 0 auto !important;
+    }
+    
+    .stChatInputContainer > div {
+        max-width: 680px !important;
+        margin: 0 auto !important;
+    }
+    
+    /* Target the actual chat input field */
+    [data-testid="stChatInput"] {
+        max-width: 680px !important;
+        margin: 0 auto !important;
+    }
+    
+    [data-testid="stChatInput"] > div {
+        max-width: 680px !important;
     }
     
     /* Dividers - SUBTLE */
@@ -447,6 +464,9 @@ def render_search_results():
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
+    # Wrap everything in a container
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
+    
     # Back button
     if st.button("← Back"):
         st.session_state["current_step"] = "landing"
@@ -454,6 +474,8 @@ def render_career_chat():
     
     st.markdown("<div style='font-size: 1.1rem; font-weight: 500; margin: 1rem 0;'>Career Guidance</div>", unsafe_allow_html=True)
     st.markdown("<div style='font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;'>Ask me anything about your career path</div>", unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Chat history - will be auto-contained by CSS
     for msg in st.session_state.get("chat_history", []):
