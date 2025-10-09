@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import requests
 import re
+import os
 
 router = APIRouter()
 
@@ -151,6 +152,73 @@ def _filter_jobs(
 # =========================
 # Real API Integration
 # =========================
+
+# JSearch API Configuration
+JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "3284d8ef3amshbb37243bfa494e3p1620b1jsn405a5817b14c")
+JSEARCH_HOST = "jsearch.p.rapidapi.com"
+
+def fetch_jsearch_jobs(query: str, location: str = None, page: int = 1, num_pages: int = 1) -> List[Dict[str, Any]]:
+    """Fetch jobs from JSearch API (RapidAPI) - PRIMARY SOURCE"""
+    try:
+        # Build search query
+        search_query = query
+        if location:
+            search_query = f"{query} in {location}"
+        
+        url = "https://jsearch.p.rapidapi.com/search"
+        params = {
+            "query": search_query,
+            "page": str(page),
+            "num_pages": str(num_pages),
+            "date_posted": "all"
+        }
+        
+        headers = {
+            "x-rapidapi-host": JSEARCH_HOST,
+            "x-rapidapi-key": JSEARCH_API_KEY
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            jobs_data = data.get("data", [])
+            
+            # Transform to our format
+            results = []
+            for job in jobs_data:
+                # Clean up description
+                description = job.get("job_description", "")
+                if description and len(description) > 500:
+                    description = description[:500] + "..."
+                
+                # Extract requirements from description or qualifications
+                requirements = []
+                qualifications = job.get("job_required_skills", [])
+                if qualifications:
+                    requirements = qualifications[:5]
+                
+                results.append({
+                    "title": job.get("job_title", "Unknown"),
+                    "company": job.get("employer_name", "Unknown"),
+                    "location": job.get("job_city", job.get("job_state", job.get("job_country", "Remote"))),
+                    "type": job.get("job_employment_type", "Full-time"),
+                    "description": description,
+                    "requirements": requirements,
+                    "match_score": 75,  # Will be calculated based on resume
+                    "source": "jsearch",
+                    "url": job.get("job_apply_link", job.get("job_google_link", ""))
+                })
+            
+            return results
+        else:
+            print(f"JSearch API error: {response.status_code} - {response.text}")
+            return []
+            
+    except Exception as e:
+        print(f"JSearch fetch error: {e}")
+        return []
+
 def fetch_remoteok_jobs(query: str = None, limit: int = 50) -> List[Dict[str, Any]]:
     """Fetch jobs from RemoteOK API"""
     try:
@@ -273,56 +341,66 @@ def fetch_arbeitnow_jobs(query: str = None, limit: int = 50) -> List[Dict[str, A
 # =========================
 @router.post("/search-jobs")
 def search_jobs(req: JobSearchRequest):
-    """Search for jobs from multiple sources and return personalized recommendations."""
+    """Search for jobs from multiple sources with JSearch as primary source."""
     
-    # Fetch from all sources
     all_jobs = []
     
-    # Fetch from RemoteOK
-    all_jobs.extend(fetch_remoteok_jobs(req.job_title, limit=30))
+    # PRIMARY: JSearch API (paid, high quality, diverse results)
+    if req.job_title:
+        jsearch_jobs = fetch_jsearch_jobs(
+            query=req.job_title,
+            location=req.location,
+            page=1,
+            num_pages=2  # Fetch 2 pages for more variety
+        )
+        all_jobs.extend(jsearch_jobs)
     
-    # Fetch from TheMuse
-    all_jobs.extend(fetch_themuse_jobs(req.job_title, limit=20))
+    # FALLBACK: Free APIs (if JSearch fails or for additional results)
+    if len(all_jobs) < 10:
+        all_jobs.extend(fetch_remoteok_jobs(req.job_title, limit=15))
+        all_jobs.extend(fetch_themuse_jobs(req.job_title, limit=10))
+        all_jobs.extend(fetch_arbeitnow_jobs(req.job_title, limit=10))
     
-    # Fetch from Arbeitnow
-    all_jobs.extend(fetch_arbeitnow_jobs(req.job_title, limit=20))
-    
-    # Fallback to mock data if no results
+    # Last resort: mock data
     if not all_jobs:
         all_jobs = MOCK_JOBS.copy()
     
-    # Filter by other criteria
-    filtered_jobs = all_jobs
-    
-    if req.location:
-        location_lower = req.location.lower()
-        filtered_jobs = [j for j in filtered_jobs if location_lower in j["location"].lower()]
-    
+    # Filter by company if specified
     if req.company:
         company_lower = req.company.lower()
-        filtered_jobs = [j for j in filtered_jobs if company_lower in j["company"].lower()]
+        all_jobs = [j for j in all_jobs if company_lower in j["company"].lower()]
     
     # Calculate match scores if resume provided
     if req.user_resume:
-        for job in filtered_jobs:
+        for job in all_jobs:
             job["match_score"] = _calculate_match_score(job, req.user_resume)
     
+    # Remove duplicates (same title + company)
+    seen = set()
+    unique_jobs = []
+    for job in all_jobs:
+        key = (job.get("title", "").lower(), job.get("company", "").lower())
+        if key not in seen:
+            seen.add(key)
+            unique_jobs.append(job)
+    
     # Sort by match score (highest first)
-    filtered_jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+    unique_jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
     
     # Limit results
-    results = filtered_jobs[:15]
+    results = unique_jobs[:20]
     
     return {
         "jobs": results,
-        "total_found": len(filtered_jobs),
+        "total_found": len(unique_jobs),
         "showing": len(results),
         "search_criteria": {
             "job_title": req.job_title,
             "location": req.location,
             "company": req.company,
             "skills": req.skills
-        }
+        },
+        "sources_used": ["jsearch", "remoteok", "themuse", "arbeitnow"] if len(all_jobs) > 0 else ["mock"]
     }
 
 @router.post("/analyze-job")
