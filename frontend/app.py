@@ -103,9 +103,7 @@ st.markdown("""
     }
     
     .pathio-tagline {
-        font-size: 0.95rem !important;
-        color: var(--text-secondary);
-        font-weight: 400 !important;
+        display: none !important;
     }
     
     /* Inputs - WHITE BACKGROUND, NO SHADOW */
@@ -122,11 +120,12 @@ st.markdown("""
         box-shadow: none !important;
     }
     
-    /* Remove shadow from input container */
+    /* Remove shadow AND border from input container */
     .stTextInput > div,
     .stTextInput > div > div {
         box-shadow: none !important;
         background: transparent !important;
+        border: none !important;
     }
     
     /* Force no border change on ANY state */
@@ -389,10 +388,13 @@ def render_landing():
     st.markdown("""
         <div style='margin-top: 2rem; font-size: 0.9rem; line-height: 2;'>
             <a href="?action=career" style='color: var(--text-secondary); text-decoration: none; display: block;'>
-                Actually, I need career guidance first →
+                ACTUALLY, I need career guidance first →
             </a>
+            <div style='margin: 0.75rem 0; color: var(--text-secondary); text-align: center; font-size: 0.85rem;'>
+                OR
+            </div>
             <a href="?action=apply" style='color: var(--text-secondary); text-decoration: none; display: block;'>
-                I already have a job listing I want to apply to, help me get it →
+                I already have a job I want to apply to. Help me get it →
             </a>
         </div>
     """, unsafe_allow_html=True)
