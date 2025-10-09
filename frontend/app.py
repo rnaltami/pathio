@@ -75,65 +75,64 @@ st.markdown("""
         margin: 0 auto;
     }
     
-    /* Custom text styles - INTER FONT */
+    /* Custom text styles - UNIFORM SIZING */
     * {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-size: 0.95rem !important;
     }
     
     h1, h2, h3, h4, h5, h6, p, span, div, label {
         color: var(--text-primary) !important;
+        font-size: 0.95rem !important;
+        font-weight: 400 !important;
+        margin: 0.3rem 0 !important;
     }
     
-    h1 { font-size: 1.5rem !important; margin: 0.5rem 0 !important; font-weight: 500 !important; }
-    h2 { font-size: 1.25rem !important; margin: 0.5rem 0 !important; font-weight: 500 !important; }
-    h3 { font-size: 1.1rem !important; margin: 0.4rem 0 !important; font-weight: 500 !important; }
-    p { font-size: 0.9rem !important; margin: 0.3rem 0 !important; }
-    
-    /* Header/Brand - PERPLEXITY STYLE */
+    /* Header/Brand - STANDS OUT */
     .pathio-header {
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 2.5rem;
     }
     
     .pathio-logo {
-        font-size: 1.5rem;
-        font-weight: 300;
-        letter-spacing: -0.3px;
-        color: #404040;
-        margin-bottom: 0.25rem;
+        font-size: 1.8rem !important;
+        font-weight: 400 !important;
+        letter-spacing: -0.5px;
+        color: #303030;
+        margin-bottom: 0.3rem;
     }
     
     .pathio-tagline {
-        font-size: 0.8rem;
+        font-size: 0.95rem !important;
         color: var(--text-secondary);
-        font-weight: 400;
+        font-weight: 400 !important;
     }
     
-    /* Inputs - PERPLEXITY STYLE (border only, no background) */
+    /* Inputs - WHITE BACKGROUND, NO RED BORDER */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        background-color: transparent !important;
+        background-color: #FFFFFF !important;
         border: 1px solid var(--border-color) !important;
         border-radius: 10px !important;
         color: var(--text-primary) !important;
         font-size: 0.95rem !important;
         font-weight: 400 !important;
         padding: 0.75rem 1rem !important;
-        transition: none;
+        transition: none !important;
     }
     
+    /* Force no border change on ANY state */
     .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border-color: var(--border-color) !important;
+    .stTextInput > div > div > input:active,
+    .stTextInput > div > div > input:focus-visible,
+    .stTextInput > div > div > input:hover,
+    .stTextArea > div > div > textarea:focus,
+    .stTextArea > div > div > textarea:active,
+    .stTextArea > div > div > textarea:focus-visible,
+    .stTextArea > div > div > textarea:hover {
+        border: 1px solid var(--border-color) !important;
         outline: none !important;
         box-shadow: none !important;
-    }
-    
-    /* Remove red border on focus */
-    .stTextInput > div > div > input:focus-visible,
-    .stTextArea > div > div > textarea:focus-visible {
-        border-color: var(--border-color) !important;
-        outline: none !important;
     }
     
     .stTextInput > div > div > input::placeholder,
@@ -352,22 +351,25 @@ def render_landing():
     """Landing page - Story-driven like Perplexity"""
     render_header()
     
-    # Main search field
-    search_query = st.text_input(
-        "search",
-        placeholder="Search for a job... writer, data scientist, marketing manager",
-        label_visibility="collapsed",
-        key="main_search"
-    )
-    
-    # Search button below, centered
-    col1, col2, col3 = st.columns([2, 1, 2])
-    with col2:
-        if st.button("Search", type="primary", use_container_width=True):
-            if search_query:
-                st.session_state["search_query"] = search_query
-                st.session_state["current_step"] = "search"
-                st.rerun()
+    # Use form to enable Enter key submission
+    with st.form(key="search_form", clear_on_submit=False):
+        # Main search field
+        search_query = st.text_input(
+            "search",
+            placeholder="Search for a job... writer, data scientist, marketing manager",
+            label_visibility="collapsed",
+            key="main_search"
+        )
+        
+        # Search button below, centered
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            submitted = st.form_submit_button("Search", type="primary", use_container_width=True)
+        
+        if submitted and search_query:
+            st.session_state["search_query"] = search_query
+            st.session_state["current_step"] = "search"
+            st.rerun()
     
     # Story-style alternative actions (Perplexity style)
     st.markdown("""
