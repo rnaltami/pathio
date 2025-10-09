@@ -44,14 +44,17 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stStatusWidget"] {display: none;}
     
-    /* Global styles - MINIMAL COLOR PALETTE */
+    /* Global styles - PERPLEXITY STYLE */
     :root {
         --bg-primary: #FFFFFF;
-        --text-primary: #1A1A1A;
-        --text-secondary: #6B6B6B;
-        --accent-primary: #3B82F6;
-        --border-color: #E5E7EB;
+        --text-primary: #202020;
+        --text-secondary: #707070;
+        --accent-primary: #20808D;
+        --border-color: #E0E0E0;
     }
+    
+    /* Import a clean font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
     
     /* Override Streamlit's default background */
     .main, .stApp {
@@ -65,76 +68,92 @@ st.markdown("""
         padding-bottom: 1.5rem;
     }
     
-    /* Custom text styles - SCALED DOWN */
-    h1, h2, h3, h4, h5, h6, p, span, div, label {
-        color: var(--text-primary) !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    /* Custom text styles - INTER FONT */
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
     
-    h1 { font-size: 1.5rem !important; margin: 0.5rem 0 !important; }
-    h2 { font-size: 1.25rem !important; margin: 0.5rem 0 !important; }
-    h3 { font-size: 1.1rem !important; margin: 0.4rem 0 !important; }
+    h1, h2, h3, h4, h5, h6, p, span, div, label {
+        color: var(--text-primary) !important;
+    }
+    
+    h1 { font-size: 1.5rem !important; margin: 0.5rem 0 !important; font-weight: 500 !important; }
+    h2 { font-size: 1.25rem !important; margin: 0.5rem 0 !important; font-weight: 500 !important; }
+    h3 { font-size: 1.1rem !important; margin: 0.4rem 0 !important; font-weight: 500 !important; }
     p { font-size: 0.9rem !important; margin: 0.3rem 0 !important; }
     
-    /* Header/Brand - SMALLER */
+    /* Header/Brand - PERPLEXITY STYLE */
     .pathio-header {
         text-align: center;
-        margin-bottom: 1.5rem;
-        animation: fadeIn 0.6s ease-in;
+        margin-bottom: 2rem;
     }
     
     .pathio-logo {
-        font-size: 1.75rem;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        color: var(--accent-primary);
+        font-size: 1.5rem;
+        font-weight: 300;
+        letter-spacing: -0.3px;
+        color: #404040;
         margin-bottom: 0.25rem;
     }
     
     .pathio-tagline {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         color: var(--text-secondary);
         font-weight: 400;
     }
     
-    /* Inputs - SMALLER, CLEANER */
+    /* Inputs - PERPLEXITY STYLE (border only, no background) */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        background-color: var(--bg-primary) !important;
+        background-color: transparent !important;
         border: 1px solid var(--border-color) !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         color: var(--text-primary) !important;
-        font-size: 0.9rem !important;
-        padding: 0.6rem 0.9rem !important;
+        font-size: 0.95rem !important;
+        font-weight: 400 !important;
+        padding: 0.75rem 1rem !important;
         transition: border-color 0.2s ease;
     }
     
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
-        border-color: var(--accent-primary) !important;
+        border-color: var(--text-primary) !important;
         outline: none !important;
+        box-shadow: none !important;
     }
     
     .stTextInput > div > div > input::placeholder,
     .stTextArea > div > div > textarea::placeholder {
         color: var(--text-secondary) !important;
-        opacity: 0.6;
+        opacity: 0.7;
+        font-weight: 400;
     }
     
-    /* Buttons - SMALLER, MINIMAL */
+    /* Buttons - CLEAN, NO BACKGROUND */
     .stButton > button {
-        background-color: var(--accent-primary) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 6px !important;
+        background-color: transparent !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
         padding: 0.5rem 1rem !important;
-        font-weight: 500 !important;
+        font-weight: 400 !important;
         font-size: 0.85rem !important;
-        transition: opacity 0.2s ease !important;
+        transition: border-color 0.2s ease !important;
         cursor: pointer !important;
     }
     
     .stButton > button:hover {
+        border-color: var(--text-primary) !important;
+    }
+    
+    /* Primary button style */
+    .stButton > button[kind="primary"] {
+        background-color: var(--text-primary) !important;
+        color: white !important;
+        border: 1px solid var(--text-primary) !important;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
         opacity: 0.9;
     }
     
@@ -283,38 +302,42 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - compact, all-in-one-screen design"""
+    """Landing page - Perplexity style"""
     render_header()
     
-    # Main search - prominent
-    search_query = st.text_input(
-        "search",
-        placeholder="What job are you looking for? (e.g., Marketing Manager, Writer...)",
-        label_visibility="collapsed",
-        key="main_search"
-    )
-    
-    col1, col2 = st.columns([2, 1])
+    # Main search with button inside
+    col1, col2 = st.columns([5, 1])
     with col1:
-        if st.button("Search Jobs", use_container_width=True, type="primary"):
+        search_query = st.text_input(
+            "search",
+            placeholder="Search for a job... writer, data scientist, marketing manager",
+            label_visibility="collapsed",
+            key="main_search"
+        )
+    with col2:
+        st.markdown("<div style='padding-top: 0.1rem;'></div>", unsafe_allow_html=True)
+        if st.button("Search", type="primary", use_container_width=True):
             if search_query:
                 st.session_state["search_query"] = search_query
                 st.session_state["current_step"] = "search"
                 st.rerun()
-            else:
-                st.warning("Please enter a job title")
     
-    # Compact alternative actions
-    st.markdown("<div style='margin: 1.5rem 0 0.5rem 0; font-size: 0.85rem; color: var(--text-secondary);'>Or:</div>", unsafe_allow_html=True)
+    # Clean alternative text
+    st.markdown("""
+        <div style='margin: 2rem 0 1rem 0; text-align: center; font-size: 0.85rem; color: var(--text-secondary);'>
+            Or
+        </div>
+    """, unsafe_allow_html=True)
     
+    # Simple text buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📋 I have a job listing", use_container_width=True):
-            st.session_state["current_step"] = "paste_job"
+        if st.button("I need career guidance", use_container_width=True):
+            st.session_state["current_step"] = "chat"
             st.rerun()
     with col2:
-        if st.button("💬 Career guidance", use_container_width=True):
-            st.session_state["current_step"] = "chat"
+        if st.button("I already have a job to apply to", use_container_width=True):
+            st.session_state["current_step"] = "paste_job"
             st.rerun()
 
 def render_paste_job():
