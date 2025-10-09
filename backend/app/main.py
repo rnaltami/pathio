@@ -234,12 +234,14 @@ app.include_router(export_router)
 # Other routers (after export)
 # =========================
 from .routers.quick import router as quick_router
+from .routers.jobs import router as jobs_router
 try:
     from .routers.public import router as public_router
 except Exception:
     public_router = None
 
 app.include_router(quick_router)
+app.include_router(jobs_router)
 if public_router:
     app.include_router(public_router)
 
@@ -255,6 +257,6 @@ def root():
     return {
         "service": "Pathio backend",
         "status": "ok",
-        "routes": ["/quick-tailor", "/export", "/coach", "/healthz"],
+        "routes": ["/quick-tailor", "/export", "/coach", "/search-jobs", "/analyze-job", "/healthz"],
         "cors_allowed": allow_origins,
     }
