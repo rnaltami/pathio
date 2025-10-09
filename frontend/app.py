@@ -388,13 +388,10 @@ def render_landing():
     st.markdown("""
         <div style='margin-top: 2rem; font-size: 0.9rem; line-height: 2;'>
             <a href="?action=career" style='color: var(--text-secondary); text-decoration: none; display: block;'>
-                ACTUALLY, I need career guidance first →
+                I need career guidance first →
             </a>
-            <div style='margin: 0.75rem 0; color: var(--text-secondary); text-align: center; font-size: 0.85rem;'>
-                OR
-            </div>
             <a href="?action=apply" style='color: var(--text-secondary); text-decoration: none; display: block;'>
-                I already have a job I want to apply to. Help me get it →
+                I already have a job listing I want to apply to. Help me get it →
             </a>
         </div>
     """, unsafe_allow_html=True)
