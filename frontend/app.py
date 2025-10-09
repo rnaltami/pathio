@@ -63,9 +63,16 @@ st.markdown("""
     }
     
     .block-container {
-        max-width: 800px;
+        max-width: 680px;
         padding-top: 1.5rem;
         padding-bottom: 1.5rem;
+        margin: 0 auto;
+    }
+    
+    /* Consistent container for all content */
+    .content-container {
+        max-width: 680px;
+        margin: 0 auto;
     }
     
     /* Custom text styles - INTER FONT */
@@ -181,12 +188,21 @@ st.markdown("""
         margin: 0.15rem 0 !important;
     }
     
-    /* Chat messages */
+    /* Chat messages - CONTAINED */
     .stChatMessage {
         border: 1px solid var(--border-color) !important;
         border-radius: 8px !important;
         padding: 0.75rem !important;
         margin-bottom: 0.5rem !important;
+        max-width: 680px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    
+    /* Chat input container */
+    .stChatInputContainer {
+        max-width: 680px !important;
+        margin: 0 auto !important;
     }
     
     /* Dividers - SUBTLE */
@@ -302,20 +318,20 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - Perplexity style"""
+    """Landing page - Perplexity style with clean button placement"""
     render_header()
     
-    # Main search with button inside
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        search_query = st.text_input(
-            "search",
-            placeholder="Search for a job... writer, data scientist, marketing manager",
-            label_visibility="collapsed",
-            key="main_search"
-        )
+    # Main search field
+    search_query = st.text_input(
+        "search",
+        placeholder="Search for a job... writer, data scientist, marketing manager",
+        label_visibility="collapsed",
+        key="main_search"
+    )
+    
+    # Search button below, centered
+    col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
-        st.markdown("<div style='padding-top: 0.1rem;'></div>", unsafe_allow_html=True)
         if st.button("Search", type="primary", use_container_width=True):
             if search_query:
                 st.session_state["search_query"] = search_query
@@ -430,23 +446,22 @@ def render_search_results():
                 st.rerun()
 
 def render_career_chat():
-    """Career exploration chat interface"""
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        if st.button("← Back"):
-            st.session_state["current_step"] = "landing"
-            st.rerun()
+    """Career exploration chat interface - CONTAINED"""
+    # Back button
+    if st.button("← Back"):
+        st.session_state["current_step"] = "landing"
+        st.rerun()
     
-    st.markdown("### 💬 Career Exploration")
-    st.markdown("Not sure what you're looking for? Let's explore your options together.")
+    st.markdown("<div style='font-size: 1.1rem; font-weight: 500; margin: 1rem 0;'>Career Guidance</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;'>Ask me anything about your career path</div>", unsafe_allow_html=True)
     
-    # Chat history
+    # Chat history - will be auto-contained by CSS
     for msg in st.session_state.get("chat_history", []):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     
-    # Chat input
-    user_input = st.chat_input("Ask me anything about careers...")
+    # Chat input - will be auto-contained by CSS
+    user_input = st.chat_input("Ask me anything...")
     
     if user_input:
         # Add user message
