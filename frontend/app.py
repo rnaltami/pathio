@@ -44,18 +44,18 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stStatusWidget"] {display: none;}
     
-    /* Global styles */
+    /* Global styles - LIGHT MODE */
     :root {
-        --bg-primary: #0A0A0A;
-        --bg-secondary: #151515;
-        --bg-tertiary: #1F1F1F;
-        --text-primary: #ECECEC;
-        --text-secondary: #B4B4B4;
-        --text-tertiary: #6B6B6B;
+        --bg-primary: #FFFFFF;
+        --bg-secondary: #F8F9FA;
+        --bg-tertiary: #F1F3F5;
+        --text-primary: #1A1A1A;
+        --text-secondary: #6B6B6B;
+        --text-tertiary: #9CA3AF;
         --accent-primary: #3B82F6;
         --accent-hover: #2563EB;
-        --border-color: #2A2A2A;
-        --input-bg: #1A1A1A;
+        --border-color: #E5E7EB;
+        --input-bg: #FFFFFF;
     }
     
     /* Override Streamlit's default background */
@@ -163,18 +163,19 @@ st.markdown("""
     
     /* Cards/Containers */
     .job-card {
-        background-color: var(--bg-secondary);
+        background-color: var(--bg-primary);
         border: 1px solid var(--border-color);
         border-radius: 12px;
         padding: 1.25rem;
         margin-bottom: 1rem;
         transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .job-card:hover {
         border-color: var(--accent-primary);
         transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
     }
     
     /* Chat messages */
@@ -299,61 +300,97 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - main search interface"""
+    """Landing page - clearer paths for different user needs"""
     render_header()
     
-    # Main search box
-    st.markdown('<div class="search-container">', unsafe_allow_html=True)
+    # Path 1: Job Search
+    st.markdown("### 🔍 Explore Job Opportunities")
+    st.markdown("Search for jobs across multiple sources")
+    
     search_query = st.text_input(
         "search",
-        placeholder="What kind of job are you looking for?",
+        placeholder="e.g., Marketing Manager, Software Engineer, Writer...",
         label_visibility="collapsed",
         key="main_search"
     )
-    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Quick actions
-    col1, col2, col3 = st.columns(3)
+    if st.button("Search Jobs", use_container_width=True, type="primary"):
+        if search_query:
+            st.session_state["search_query"] = search_query
+            st.session_state["current_step"] = "search"
+            st.rerun()
+        else:
+            st.warning("Please enter a job title or role")
+    
+    st.markdown("---")
+    
+    # Path 2: Already Have a Job
+    st.markdown("### 📋 Already Have a Job Listing?")
+    st.markdown("Get help tailoring your application")
+    
+    if st.button("Paste Job & Resume", use_container_width=True):
+        st.session_state["current_step"] = "paste_job"
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Path 3: Career Exploration
+    st.markdown("### 💬 Not Sure What to Pursue?")
+    st.markdown("Chat with our AI career coach")
+    
+    if st.button("Start Career Chat", use_container_width=True):
+        st.session_state["current_step"] = "chat"
+        st.rerun()
+
+def render_paste_job():
+    """Direct job paste interface for users who already have a listing"""
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Back"):
+            st.session_state["current_step"] = "landing"
+            st.rerun()
+    
+    st.markdown("### 📋 Paste Your Job Listing & Resume")
+    st.markdown("We'll help you tailor your application")
+    
+    job_text = st.text_area(
+        "job_listing",
+        placeholder="Paste the job description here...",
+        height=200,
+        label_visibility="collapsed",
+        key="paste_job_text"
+    )
+    
+    st.markdown("**Your Resume:**")
+    resume_text = st.text_area(
+        "resume",
+        placeholder="Paste your resume here...",
+        height=250,
+        label_visibility="collapsed",
+        key="paste_resume_text"
+    )
+    
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔍 Search Jobs", use_container_width=True):
-            if search_query:
-                st.session_state["search_query"] = search_query
-                st.session_state["current_step"] = "search"
+        if st.button("🎯 Get Preparation Tips", use_container_width=True):
+            if job_text and resume_text:
+                st.session_state["pasted_job"] = job_text
+                st.session_state["user_resume"] = resume_text
+                st.session_state["current_step"] = "prepare_direct"
                 st.rerun()
+            else:
+                st.warning("Please paste both job listing and resume")
     
     with col2:
-        if st.button("💬 Not Sure? Chat with AI", use_container_width=True, key="chat_btn"):
-            st.session_state["current_step"] = "chat"
-            st.rerun()
-    
-    with col3:
-        if st.button("📄 Have Resume? Upload", use_container_width=True, key="upload_btn"):
-            st.session_state["show_resume_upload"] = True
-            st.rerun()
-    
-    # Resume upload section
-    if st.session_state.get("show_resume_upload", False):
-        st.markdown("---")
-        st.markdown("### 📄 Upload or Paste Your Resume")
-        resume_text = st.text_area(
-            "resume",
-            placeholder="Paste your resume here to get personalized job matches...",
-            height=200,
-            label_visibility="collapsed"
-        )
-        
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            if st.button("Save Resume"):
+        if st.button("🚀 Tailor Resume & Cover Letter", use_container_width=True, type="primary"):
+            if job_text and resume_text:
+                st.session_state["pasted_job"] = job_text
                 st.session_state["user_resume"] = resume_text
-                st.session_state["show_resume_upload"] = False
-                st.success("Resume saved! Now search for jobs to see personalized matches.")
+                st.session_state["current_step"] = "apply_direct"
                 st.rerun()
-        with col2:
-            if st.button("Cancel", key="cancel_resume"):
-                st.session_state["show_resume_upload"] = False
-                st.rerun()
+            else:
+                st.warning("Please paste both job listing and resume")
 
 def render_search_results():
     """Display job search results"""
@@ -476,22 +513,210 @@ def render_job_detail():
             st.rerun()
 
 def render_prepare():
-    """Preparation/action plan view"""
-    st.markdown("### 🎯 Becoming a Stronger Candidate")
-    st.info("This feature will show personalized action plans based on the job requirements and your resume.")
+    """Preparation/action plan view - from job search flow"""
+    job = st.session_state.get("selected_job")
     
-    if st.button("← Back to Job"):
-        st.session_state["current_step"] = "job_detail"
-        st.rerun()
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Back"):
+            st.session_state["current_step"] = "job_detail"
+            st.rerun()
+    
+    st.markdown("### 🎯 Becoming a Stronger Candidate")
+    
+    # Call the better-candidate endpoint
+    with st.spinner("Analyzing job requirements and creating your action plan..."):
+        try:
+            job_text = f"{job.get('title')} at {job.get('company')}\n\n{job.get('description')}"
+            response = requests.post(
+                f"{backend_url}/better-candidate",
+                json={
+                    "resume_text": st.session_state.get("user_resume", ""),
+                    "job_text": job_text
+                },
+                timeout=90
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                actions = data.get("actions", [])
+                
+                if actions:
+                    st.markdown("**Here's your personalized action plan:**")
+                    for action in actions:
+                        with st.container():
+                            st.markdown(f"### {action.get('title')}")
+                            if action.get('why'):
+                                st.markdown(f"*Why: {action.get('why')}*")
+                            if action.get('steps'):
+                                st.markdown("**Steps:**")
+                                for step in action['steps']:
+                                    st.markdown(f"- {step}")
+                            st.markdown("---")
+                else:
+                    st.info("Upload your resume to get personalized recommendations.")
+            else:
+                st.error("Unable to generate action plan. Please try again.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+def render_prepare_direct():
+    """Preparation from direct paste flow"""
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Back"):
+            st.session_state["current_step"] = "paste_job"
+            st.rerun()
+    
+    st.markdown("### 🎯 Your Personalized Action Plan")
+    
+    with st.spinner("Analyzing and creating your action plan..."):
+        try:
+            response = requests.post(
+                f"{backend_url}/better-candidate",
+                json={
+                    "resume_text": st.session_state.get("user_resume", ""),
+                    "job_text": st.session_state.get("pasted_job", "")
+                },
+                timeout=90
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                actions = data.get("actions", [])
+                
+                if actions:
+                    for action in actions:
+                        with st.container():
+                            st.markdown(f"### {action.get('title')}")
+                            if action.get('why'):
+                                st.markdown(f"*{action.get('why')}*")
+                            if action.get('steps'):
+                                st.markdown("**Steps:**")
+                                for step in action['steps']:
+                                    st.markdown(f"- {step}")
+                            st.markdown("---")
+                    
+                    if st.button("Ready to Apply Now?", type="primary"):
+                        st.session_state["current_step"] = "apply_direct"
+                        st.rerun()
+                else:
+                    st.info("No specific actions needed - you look ready to apply!")
+            else:
+                st.error("Unable to generate action plan.")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 def render_apply():
-    """Application tailoring view"""
-    st.markdown("### 🚀 Tailor Your Application")
-    st.info("This feature will tailor your resume and generate a cover letter.")
+    """Application tailoring view - from job search flow"""
+    job = st.session_state.get("selected_job")
     
-    if st.button("← Back to Job"):
-        st.session_state["current_step"] = "job_detail"
-        st.rerun()
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Back"):
+            st.session_state["current_step"] = "job_detail"
+            st.rerun()
+    
+    st.markdown("### 🚀 Tailored Application")
+    
+    with st.spinner("Tailoring your resume and generating cover letter..."):
+        try:
+            job_text = f"{job.get('title')} at {job.get('company')}\n\n{job.get('description')}\n\nRequirements:\n" + "\n".join(f"- {req}" for req in job.get('requirements', []))
+            
+            response = requests.post(
+                f"{backend_url}/quick-tailor",
+                json={
+                    "resume_text": st.session_state.get("user_resume", ""),
+                    "job_text": job_text,
+                    "user_tweaks": {}
+                },
+                timeout=120
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                tab1, tab2, tab3 = st.tabs(["Tailored Resume", "Cover Letter", "What Changed"])
+                
+                with tab1:
+                    st.markdown(data.get("tailored_resume_md", ""))
+                
+                with tab2:
+                    st.markdown(data.get("cover_letter_md", ""))
+                
+                with tab3:
+                    st.markdown(data.get("what_changed_md", "No changes noted."))
+                
+                st.markdown("---")
+                st.download_button(
+                    "Download Resume",
+                    data=data.get("tailored_resume_md", ""),
+                    file_name="pathio_resume.md",
+                    mime="text/markdown"
+                )
+            else:
+                st.error("Unable to tailor application. Please try again.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+def render_apply_direct():
+    """Application tailoring from direct paste flow"""
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Back"):
+            st.session_state["current_step"] = "paste_job"
+            st.rerun()
+    
+    st.markdown("### 🚀 Your Tailored Application")
+    
+    with st.spinner("Tailoring your resume and generating cover letter..."):
+        try:
+            response = requests.post(
+                f"{backend_url}/quick-tailor",
+                json={
+                    "resume_text": st.session_state.get("user_resume", ""),
+                    "job_text": st.session_state.get("pasted_job", ""),
+                    "user_tweaks": {}
+                },
+                timeout=120
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                tab1, tab2, tab3 = st.tabs(["Tailored Resume", "Cover Letter", "What Changed"])
+                
+                with tab1:
+                    st.markdown(data.get("tailored_resume_md", ""))
+                
+                with tab2:
+                    st.markdown(data.get("cover_letter_md", ""))
+                
+                with tab3:
+                    st.markdown(data.get("what_changed_md", "No changes noted."))
+                
+                st.markdown("---")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button(
+                        "Download Resume",
+                        data=data.get("tailored_resume_md", ""),
+                        file_name="pathio_resume.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+                with col2:
+                    st.download_button(
+                        "Download Cover Letter",
+                        data=data.get("cover_letter_md", ""),
+                        file_name="pathio_cover_letter.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+            else:
+                st.error("Unable to tailor application.")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 # =========================
 # Main App Router
@@ -502,6 +727,8 @@ def main():
     
     if current_step == "landing":
         render_landing()
+    elif current_step == "paste_job":
+        render_paste_job()
     elif current_step == "search":
         render_search_results()
     elif current_step == "chat":
@@ -510,8 +737,12 @@ def main():
         render_job_detail()
     elif current_step == "prepare":
         render_prepare()
+    elif current_step == "prepare_direct":
+        render_prepare_direct()
     elif current_step == "apply":
         render_apply()
+    elif current_step == "apply_direct":
+        render_apply_direct()
 
 if __name__ == "__main__":
     main()
