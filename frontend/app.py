@@ -119,14 +119,21 @@ st.markdown("""
         font-size: 0.95rem !important;
         font-weight: 400 !important;
         padding: 0.75rem 1rem !important;
-        transition: border-color 0.2s ease;
+        transition: none;
     }
     
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
-        border-color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
         outline: none !important;
         box-shadow: none !important;
+    }
+    
+    /* Remove red border on focus */
+    .stTextInput > div > div > input:focus-visible,
+    .stTextArea > div > div > textarea:focus-visible {
+        border-color: var(--border-color) !important;
+        outline: none !important;
     }
     
     .stTextInput > div > div > input::placeholder,
@@ -153,7 +160,7 @@ st.markdown("""
         border-color: var(--text-primary) !important;
     }
     
-    /* Primary button - SUBTLE TEXT STYLE */
+    /* Primary button - MINIMAL (no hover fill) */
     .stButton > button[kind="primary"] {
         background-color: transparent !important;
         color: var(--text-primary) !important;
@@ -162,8 +169,7 @@ st.markdown("""
     }
     
     .stButton > button[kind="primary"]:hover {
-        background-color: var(--text-primary) !important;
-        color: white !important;
+        opacity: 0.7;
     }
     
     /* Cards/Containers - COMPACT */
@@ -220,6 +226,14 @@ st.markdown("""
     
     [data-testid="stChatInput"] > div {
         max-width: 680px !important;
+    }
+    
+    /* Remove red border from chat input on focus */
+    [data-testid="stChatInput"] textarea:focus,
+    [data-testid="stChatInput"] textarea:focus-visible {
+        border-color: var(--border-color) !important;
+        outline: none !important;
+        box-shadow: none !important;
     }
     
     /* Dividers - SUBTLE */
@@ -335,7 +349,7 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - Perplexity style with clean button placement"""
+    """Landing page - Story-driven like Perplexity"""
     render_header()
     
     # Main search field
@@ -355,21 +369,24 @@ def render_landing():
                 st.session_state["current_step"] = "search"
                 st.rerun()
     
-    # Clean alternative text
+    # Story-style alternative actions (Perplexity style)
     st.markdown("""
-        <div style='margin: 2rem 0 1rem 0; text-align: center; font-size: 0.85rem; color: var(--text-secondary);'>
-            Or
-        </div>
+        <div style='margin: 2.5rem 0 1rem 0;'></div>
     """, unsafe_allow_html=True)
     
-    # Simple text buttons
-    col1, col2 = st.columns(2)
+    # Option 1: Career guidance
+    col1, col2 = st.columns([20, 1])
     with col1:
-        if st.button("I need career guidance", use_container_width=True):
+        if st.button("Actually, I need career guidance first →", use_container_width=True):
             st.session_state["current_step"] = "chat"
             st.rerun()
-    with col2:
-        if st.button("I already have a job to apply to", use_container_width=True):
+    
+    st.markdown("<div style='margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
+    
+    # Option 2: Already have a job
+    col1, col2 = st.columns([20, 1])
+    with col1:
+        if st.button("I have a job I want to apply to, help me get it →", use_container_width=True):
             st.session_state["current_step"] = "paste_job"
             st.rerun()
 
