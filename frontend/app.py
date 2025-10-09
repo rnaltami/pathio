@@ -235,6 +235,23 @@ st.markdown("""
         box-shadow: none !important;
     }
     
+    /* Hide form boxes */
+    .stForm {
+        border: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+    
+    /* Text links style - Perplexity */
+    a {
+        transition: opacity 0.2s ease;
+    }
+    
+    a:hover {
+        opacity: 0.7;
+        text-decoration: none !important;
+    }
+    
     /* Dividers - SUBTLE */
     hr {
         border: none;
@@ -348,49 +365,46 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - Story-driven like Perplexity"""
+    """Landing page - Clean, minimal like Perplexity"""
     render_header()
     
-    # Use form to enable Enter key submission
-    with st.form(key="search_form", clear_on_submit=False):
-        # Main search field
-        search_query = st.text_input(
-            "search",
-            placeholder="Search for a job... writer, data scientist, marketing manager",
-            label_visibility="collapsed",
-            key="main_search"
-        )
-        
-        # Search button below, centered
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            submitted = st.form_submit_button("Search", type="primary", use_container_width=True)
-        
-        if submitted and search_query:
-            st.session_state["search_query"] = search_query
-            st.session_state["current_step"] = "search"
-            st.rerun()
+    # Main search field (no form, just input)
+    search_query = st.text_input(
+        "search",
+        placeholder="Search for a job... writer, data scientist, marketing manager",
+        label_visibility="collapsed",
+        key="main_search",
+        on_change=lambda: handle_search() if st.session_state.get("main_search") else None
+    )
     
-    # Story-style alternative actions (Perplexity style)
+    # Alternative actions - plain text links style
     st.markdown("""
-        <div style='margin: 2.5rem 0 1rem 0;'></div>
+        <div style='margin-top: 2rem; font-size: 0.9rem; line-height: 2;'>
+            <a href="?action=career" style='color: var(--text-secondary); text-decoration: none; display: block;'>
+                Actually, I need career guidance first →
+            </a>
+            <a href="?action=apply" style='color: var(--text-secondary); text-decoration: none; display: block;'>
+                I have a job I want to apply to, help me get it →
+            </a>
+        </div>
     """, unsafe_allow_html=True)
     
-    # Option 1: Career guidance
-    col1, col2 = st.columns([20, 1])
-    with col1:
-        if st.button("Actually, I need career guidance first →", use_container_width=True):
-            st.session_state["current_step"] = "chat"
-            st.rerun()
-    
-    st.markdown("<div style='margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
-    
-    # Option 2: Already have a job
-    col1, col2 = st.columns([20, 1])
-    with col1:
-        if st.button("I have a job I want to apply to, help me get it →", use_container_width=True):
-            st.session_state["current_step"] = "paste_job"
-            st.rerun()
+    # Handle URL actions
+    qp = st.query_params
+    if qp.get("action") == "career":
+        st.session_state["current_step"] = "chat"
+        st.query_params.clear()
+        st.rerun()
+    elif qp.get("action") == "apply":
+        st.session_state["current_step"] = "paste_job"
+        st.query_params.clear()
+        st.rerun()
+
+def handle_search():
+    """Handle search submission"""
+    if st.session_state.get("main_search"):
+        st.session_state["search_query"] = st.session_state["main_search"]
+        st.session_state["current_step"] = "search"
 
 def render_paste_job():
     """Direct job paste interface for users who already have a listing"""
