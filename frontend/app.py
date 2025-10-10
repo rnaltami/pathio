@@ -601,20 +601,12 @@ def render_paste_job():
                 st.warning("Please paste both job listing and resume")
 
 def render_search_results():
-    """Display job search results - PERPLEXITY STYLE with tabs"""
+    """Display job search results - SIMPLE FOOLPROOF VERSION"""
     query = st.session_state.get("search_query", "")
     
-    # Clean back link (no border)
-    st.markdown("""
-        <a href="?back=true" style='color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;'>
-            ← Back to search
-        </a>
-    """, unsafe_allow_html=True)
-    
-    # Handle back action
-    if st.query_params.get("back") == "true":
+    # Back button using actual Streamlit button
+    if st.button("← Back to search"):
         st.session_state["current_step"] = "landing"
-        st.query_params.clear()
         st.rerun()
     
     # Search results
@@ -627,82 +619,96 @@ def render_search_results():
     
     # Results header
     st.markdown(f"""
-        <div style='margin: 1.5rem 0 1rem 0; font-size: 0.9rem; color: var(--text-secondary);'>
+        <div style='margin: 1.5rem 0 0.5rem 0; font-size: 0.9rem; color: #707070;'>
             {len(results)} {query} jobs found
         </div>
     """, unsafe_allow_html=True)
     
-    # Tabs for filtering
-    tab1, tab2, tab3 = st.tabs(["All Jobs", "Remote Only", "By Location"])
+    # Filter options using radio buttons (stays on same page)
+    filter_option = st.radio(
+        "Filter",
+        ["All Jobs", "Remote Only", "By Location"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="job_filter"
+    )
     
-    with tab1:
-        render_job_list(results)
-    
-    with tab2:
-        remote_jobs = [j for j in results if 'remote' in j.get('location', '').lower() or 'remote' in j.get('type', '').lower()]
-        if remote_jobs:
-            render_job_list(remote_jobs)
+    # Apply filtering
+    if filter_option == "Remote Only":
+        filtered_results = [j for j in results if 'remote' in j.get('location', '').lower() or 'remote' in j.get('type', '').lower()]
+        if not filtered_results:
+            st.info("No remote jobs found in this search.")
+            filtered_results = results
+    elif filter_option == "By Location":
+        location_input = st.text_input("Enter location", placeholder="e.g., San Francisco, New York", key="location_filter")
+        if location_input:
+            filtered_results = [j for j in results if location_input.lower() in j.get('location', '').lower()]
+            if not filtered_results:
+                st.warning(f"No jobs found in {location_input}. Showing all results.")
+                filtered_results = results
         else:
-            st.markdown("<div style='margin-top: 1rem; color: var(--text-secondary);'>No remote jobs found in this search.</div>", unsafe_allow_html=True)
+            filtered_results = results
+    else:
+        filtered_results = results
     
-    with tab3:
-        location_filter = st.text_input("Filter by location", placeholder="e.g., San Francisco, New York", key="location_filter")
-        if location_filter:
-            filtered_jobs = [j for j in results if location_filter.lower() in j.get('location', '').lower()]
-            if filtered_jobs:
-                render_job_list(filtered_jobs)
-            else:
-                st.markdown(f"<div style='margin-top: 1rem; color: var(--text-secondary);'>No jobs found in {location_filter}.</div>", unsafe_allow_html=True)
-        else:
-            render_job_list(results)
+    # Render the job list
+    render_job_list(filtered_results)
 
 def render_job_list(results):
-    """Render a clean list of job postings with proper styling - PURE HTML APPROACH"""
+    """Render job list - COMPLETELY HTML NO STREAMLIT WIDGETS"""
     
-    # Store results in session state for click handling
-    if "current_results" not in st.session_state:
-        st.session_state["current_results"] = []
+    # Store results in session state
     st.session_state["current_results"] = results
     
+    # Build complete HTML for all jobs
+    jobs_html = ""
     for idx, job in enumerate(results):
         job_title = job.get('title', 'Job Title')
         company = job.get('company', 'Company')
         location = job.get('location', 'Location')
         job_type = job.get('type', 'Full-time')
         
-        # Create a container for each job with columns for clickability
-        col1, col2 = st.columns([20, 1])
-        
-        with col1:
-            # Render as pure HTML styled text
-            st.markdown(f"""
-                <div style='padding: 1rem 0; border-top: 1px solid #E0E0E0;'>
-                    <div style='
-                        font-size: 0.95rem;
-                        font-weight: 500;
-                        color: #2563eb !important;
-                        margin-bottom: 0.3rem;
-                        text-align: left;
-                        cursor: pointer;
-                    '>
-                        {job_title}
-                    </div>
-                    <div style='
-                        font-size: 0.85rem;
-                        color: #707070;
-                        text-align: left;
-                    '>
-                        {company} • {location} • {job_type}
-                    </div>
+        jobs_html += f"""
+            <div style='
+                padding: 1.2rem 0;
+                border-top: 1px solid #E0E0E0;
+                cursor: pointer;
+                transition: opacity 0.2s;
+            ' onmouseover='this.style.opacity="0.7"' onmouseout='this.style.opacity="1"'>
+                <div style='
+                    font-size: 0.95rem !important;
+                    font-weight: 500 !important;
+                    color: #2563eb !important;
+                    margin-bottom: 0.4rem !important;
+                    text-align: left !important;
+                    line-height: 1.4 !important;
+                '>
+                    {job_title}
                 </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            # Invisible button for click handling
-            if st.button("→", key=f"select_job_{idx}", help="View job details"):
-                st.session_state["selected_job"] = job
-                st.session_state["current_step"] = "job_detail"
-                st.rerun()
+                <div style='
+                    font-size: 0.85rem !important;
+                    color: #707070 !important;
+                    text-align: left !important;
+                    line-height: 1.3 !important;
+                '>
+                    {company} • {location} • {job_type}
+                </div>
+            </div>
+        """
+    
+    # Render all jobs as one HTML block
+    st.markdown(jobs_html, unsafe_allow_html=True)
+    
+    # Add selection mechanism below
+    st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+    job_titles = [f"{j.get('title', 'Job')} - {j.get('company', 'Company')}" for j in results]
+    selected = st.selectbox("Select a job to view details:", [""] + job_titles, key="job_selector")
+    
+    if selected:
+        idx = job_titles.index(selected)
+        st.session_state["selected_job"] = results[idx]
+        st.session_state["current_step"] = "job_detail"
+        st.rerun()
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
