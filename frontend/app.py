@@ -128,6 +128,12 @@ st.markdown("""
         border: none !important;
     }
     
+    /* Hide "Press Enter to apply" text */
+    .stTextInput [data-testid="InputInstructions"],
+    .stTextInput .instructions {
+        display: none !important;
+    }
+    
     /* Force no border change on ANY state */
     .stTextInput > div > div > input:focus,
     .stTextInput > div > div > input:active,
