@@ -161,23 +161,30 @@ st.markdown("""
         font-weight: 400;
     }
     
-    /* Buttons - CLEAN, NO BACKGROUND */
+    /* Buttons - DEFAULT STYLE (for navigation, etc) */
     .stButton > button {
         background-color: transparent !important;
-        color: #2563eb !important;
-        border: none !important;
-        border-radius: 0 !important;
-        padding: 0.5rem 0 !important;
-        font-weight: 500 !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        font-weight: 400 !important;
         font-size: 0.95rem !important;
         transition: opacity 0.2s ease !important;
         cursor: pointer !important;
-        text-align: left !important;
     }
     
     .stButton > button:hover {
         opacity: 0.7 !important;
         background-color: transparent !important;
+    }
+    
+    /* Job selection arrow buttons - minimal */
+    .stButton > button[title*="View job"] {
+        border: none !important;
+        padding: 0.25rem 0.5rem !important;
+        font-size: 1.2rem !important;
+        color: #2563eb !important;
     }
     
     /* Job title buttons - look like text, no border, startup blue */
@@ -650,41 +657,52 @@ def render_search_results():
             render_job_list(results)
 
 def render_job_list(results):
-    """Render a clean list of job postings with proper styling - SIMPLE VERSION"""
+    """Render a clean list of job postings with proper styling - PURE HTML APPROACH"""
+    
+    # Store results in session state for click handling
+    if "current_results" not in st.session_state:
+        st.session_state["current_results"] = []
+    st.session_state["current_results"] = results
+    
     for idx, job in enumerate(results):
         job_title = job.get('title', 'Job Title')
         company = job.get('company', 'Company')
         location = job.get('location', 'Location')
         job_type = job.get('type', 'Full-time')
         
-        # Simple button approach with custom styling
-        if st.button(
-            job_title,
-            key=f"job_{idx}_{job_title[:30]}",
-            help=f"{company} • {location} • {job_type}",
-            use_container_width=True
-        ):
-            st.session_state["selected_job"] = job
-            st.session_state["current_step"] = "job_detail"
-            st.rerun()
+        # Create a container for each job with columns for clickability
+        col1, col2 = st.columns([20, 1])
         
-        # Company info directly below
-        st.markdown(f"""
-            <div style='
-                margin-top: -0.8rem;
-                margin-bottom: 1.2rem;
-                font-size: 0.85rem;
-                color: var(--text-secondary);
-                text-align: left;
-                padding-left: 0;
-            '>
-                {company} • {location} • {job_type}
-            </div>
-        """, unsafe_allow_html=True)
+        with col1:
+            # Render as pure HTML styled text
+            st.markdown(f"""
+                <div style='padding: 1rem 0; border-top: 1px solid #E0E0E0;'>
+                    <div style='
+                        font-size: 0.95rem;
+                        font-weight: 500;
+                        color: #2563eb !important;
+                        margin-bottom: 0.3rem;
+                        text-align: left;
+                        cursor: pointer;
+                    '>
+                        {job_title}
+                    </div>
+                    <div style='
+                        font-size: 0.85rem;
+                        color: #707070;
+                        text-align: left;
+                    '>
+                        {company} • {location} • {job_type}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
         
-        # Separator line
-        if idx < len(results) - 1:
-            st.markdown("<hr style='border: none; border-top: 1px solid var(--border-color); margin: 1rem 0;'>", unsafe_allow_html=True)
+        with col2:
+            # Invisible button for click handling
+            if st.button("→", key=f"select_job_{idx}", help="View job details"):
+                st.session_state["selected_job"] = job
+                st.session_state["current_step"] = "job_detail"
+                st.rerun()
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
