@@ -100,6 +100,12 @@ st.markdown("""
         letter-spacing: -0.5px;
         color: #303030;
         margin-bottom: 0.3rem;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+    
+    .pathio-logo:hover {
+        opacity: 0.7;
     }
     
     .pathio-tagline {
@@ -158,11 +164,11 @@ st.markdown("""
     /* Buttons - CLEAN, NO BACKGROUND */
     .stButton > button {
         background-color: transparent !important;
-        color: var(--text-primary) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 8px !important;
-        padding: 0.5rem 1rem !important;
-        font-weight: 400 !important;
+        color: #2563eb !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0.5rem 0 !important;
+        font-weight: 500 !important;
         font-size: 0.95rem !important;
         transition: opacity 0.2s ease !important;
         cursor: pointer !important;
@@ -170,7 +176,8 @@ st.markdown("""
     }
     
     .stButton > button:hover {
-        opacity: 0.7;
+        opacity: 0.7 !important;
+        background-color: transparent !important;
     }
     
     /* Job title buttons - look like text, no border, startup blue */
@@ -432,13 +439,22 @@ def career_chat(user_message: str, history: list):
 # =========================
 
 def render_header():
-    """Render the Pathio header"""
+    """Render the Pathio header - logo is clickable home button"""
     st.markdown("""
         <div class="pathio-header fade-in">
-            <div class="pathio-logo">pathio</div>
+            <a href="/" style="text-decoration: none;">
+                <div class="pathio-logo">pathio</div>
+            </a>
             <div class="pathio-tagline">Your AI-powered career assistant</div>
         </div>
     """, unsafe_allow_html=True)
+    
+    # Handle home button click
+    if st.query_params.get("home"):
+        st.session_state["current_step"] = "landing"
+        st.session_state["search_query"] = ""
+        st.query_params.clear()
+        st.rerun()
 
 def render_landing():
     """Landing page - Results on same page like Perplexity"""
@@ -634,48 +650,41 @@ def render_search_results():
             render_job_list(results)
 
 def render_job_list(results):
-    """Render a clean list of job postings with proper styling"""
+    """Render a clean list of job postings with proper styling - SIMPLE VERSION"""
     for idx, job in enumerate(results):
         job_title = job.get('title', 'Job Title')
         company = job.get('company', 'Company')
         location = job.get('location', 'Location')
         job_type = job.get('type', 'Full-time')
         
-        # Render job listing with clickable title
-        job_html = f"""
-            <div style='
-                padding: 1rem 0;
-                border-top: 1px solid var(--border-color);
-                cursor: pointer;
-            ' class='job-listing' data-job-idx='{idx}'>
-                <div style='
-                    font-size: 0.95rem;
-                    font-weight: 500;
-                    color: #2563eb;
-                    margin-bottom: 0.3rem;
-                    text-align: left;
-                '>
-                    {job_title}
-                </div>
-                <div style='
-                    font-size: 0.85rem;
-                    color: var(--text-secondary);
-                    text-align: left;
-                '>
-                    {company} • {location} • {job_type}
-                </div>
-            </div>
-        """
+        # Simple button approach with custom styling
+        if st.button(
+            job_title,
+            key=f"job_{idx}_{job_title[:30]}",
+            help=f"{company} • {location} • {job_type}",
+            use_container_width=True
+        ):
+            st.session_state["selected_job"] = job
+            st.session_state["current_step"] = "job_detail"
+            st.rerun()
         
-        # Use columns to make entire row clickable
-        col = st.columns([1])[0]
-        with col:
-            st.markdown(job_html, unsafe_allow_html=True)
-            # Hidden button for actual click handling
-            if st.button(f"View {job_title}", key=f"job_btn_{idx}_{job_title[:20]}", label_visibility="hidden"):
-                st.session_state["selected_job"] = job
-                st.session_state["current_step"] = "job_detail"
-                st.rerun()
+        # Company info directly below
+        st.markdown(f"""
+            <div style='
+                margin-top: -0.8rem;
+                margin-bottom: 1.2rem;
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+                text-align: left;
+                padding-left: 0;
+            '>
+                {company} • {location} • {job_type}
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Separator line
+        if idx < len(results) - 1:
+            st.markdown("<hr style='border: none; border-top: 1px solid var(--border-color); margin: 1rem 0;'>", unsafe_allow_html=True)
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
