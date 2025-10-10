@@ -190,6 +190,35 @@ st.markdown("""
         opacity: 0.7 !important;
     }
     
+    /* Hide buttons with label_visibility="hidden" */
+    button[data-testid*="baseButton-"][aria-label="hidden"] {
+        display: none !important;
+    }
+    
+    /* Job listing styling */
+    .job-listing:hover {
+        opacity: 0.7;
+    }
+    
+    /* Clean up tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.5rem 0;
+        font-size: 0.9rem !important;
+        color: var(--text-secondary) !important;
+        border-bottom: 2px solid transparent;
+        background: transparent !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        color: var(--text-primary) !important;
+        border-bottom-color: var(--text-primary) !important;
+    }
+    
     /* Job row - with top border separator */
     .job-row {
         border-top: 1px solid var(--border-color);
@@ -549,7 +578,7 @@ def render_paste_job():
                 st.warning("Please paste both job listing and resume")
 
 def render_search_results():
-    """Display job search results - PERPLEXITY STYLE"""
+    """Display job search results - PERPLEXITY STYLE with tabs"""
     query = st.session_state.get("search_query", "")
     
     # Clean back link (no border)
@@ -580,40 +609,73 @@ def render_search_results():
         </div>
     """, unsafe_allow_html=True)
     
-    # Refinement options (conversational)
-    st.markdown("""
-        <div style='margin-bottom: 2rem; font-size: 0.85rem; color: var(--text-secondary);'>
-            Refine: <a href="?refine=remote" style='color: var(--text-secondary); text-decoration: underline;'>Remote only</a> • 
-            <a href="?refine=location" style='color: var(--text-secondary); text-decoration: underline;'>Change location</a>
-        </div>
-    """, unsafe_allow_html=True)
+    # Tabs for filtering
+    tab1, tab2, tab3 = st.tabs(["All Jobs", "Remote Only", "By Location"])
     
-    # Clean list of jobs - each row clickable
+    with tab1:
+        render_job_list(results)
+    
+    with tab2:
+        remote_jobs = [j for j in results if 'remote' in j.get('location', '').lower() or 'remote' in j.get('type', '').lower()]
+        if remote_jobs:
+            render_job_list(remote_jobs)
+        else:
+            st.markdown("<div style='margin-top: 1rem; color: var(--text-secondary);'>No remote jobs found in this search.</div>", unsafe_allow_html=True)
+    
+    with tab3:
+        location_filter = st.text_input("Filter by location", placeholder="e.g., San Francisco, New York", key="location_filter")
+        if location_filter:
+            filtered_jobs = [j for j in results if location_filter.lower() in j.get('location', '').lower()]
+            if filtered_jobs:
+                render_job_list(filtered_jobs)
+            else:
+                st.markdown(f"<div style='margin-top: 1rem; color: var(--text-secondary);'>No jobs found in {location_filter}.</div>", unsafe_allow_html=True)
+        else:
+            render_job_list(results)
+
+def render_job_list(results):
+    """Render a clean list of job postings with proper styling"""
     for idx, job in enumerate(results):
         job_title = job.get('title', 'Job Title')
         company = job.get('company', 'Company')
         location = job.get('location', 'Location')
         job_type = job.get('type', 'Full-time')
         
-        # Create clickable container for entire job
-        cols = st.columns([1])
-        with cols[0]:
-            # Use button but style it to look like plain text
-            button_label = f"{job_title}\n{company} • {location} • {job_type}"
-            
-            if st.button(
-                button_label,
-                key=f"job_{idx}",
-                use_container_width=True,
-                type="secondary"
-            ):
+        # Render job listing with clickable title
+        job_html = f"""
+            <div style='
+                padding: 1rem 0;
+                border-top: 1px solid var(--border-color);
+                cursor: pointer;
+            ' class='job-listing' data-job-idx='{idx}'>
+                <div style='
+                    font-size: 0.95rem;
+                    font-weight: 500;
+                    color: #2563eb;
+                    margin-bottom: 0.3rem;
+                    text-align: left;
+                '>
+                    {job_title}
+                </div>
+                <div style='
+                    font-size: 0.85rem;
+                    color: var(--text-secondary);
+                    text-align: left;
+                '>
+                    {company} • {location} • {job_type}
+                </div>
+            </div>
+        """
+        
+        # Use columns to make entire row clickable
+        col = st.columns([1])[0]
+        with col:
+            st.markdown(job_html, unsafe_allow_html=True)
+            # Hidden button for actual click handling
+            if st.button(f"View {job_title}", key=f"job_btn_{idx}_{job_title[:20]}", label_visibility="hidden"):
                 st.session_state["selected_job"] = job
                 st.session_state["current_step"] = "job_detail"
                 st.rerun()
-        
-        # Add separator between jobs
-        if idx < len(results) - 1:
-            st.markdown("<div style='border-top: 1px solid var(--border-color); margin: 1rem 0;'></div>", unsafe_allow_html=True)
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
