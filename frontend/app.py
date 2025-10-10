@@ -445,118 +445,118 @@ def render_landing():
         st.query_params.clear()
         st.rerun()
     
-            # Show results on same page if we have a query
-            if saved_query:
-                st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
-                
-                with st.spinner("Searching..."):
-                    results = search_jobs(saved_query, st.session_state.get("user_resume"))
-                
-                if results:
-                    # Results container with border
-                    st.markdown("""
-                        <div style='
-                            border: 1px solid var(--border-color);
-                            border-radius: 10px;
-                            padding: 1.5rem;
-                            background: white;
-                            margin-bottom: 2rem;
-                        '>
-                    """, unsafe_allow_html=True)
-                    
-                    # Results header
-                    st.markdown(f"""
-                        <div style='margin-bottom: 1.5rem;'>
-                            <h3 style='margin: 0 0 0.5rem 0; color: var(--text-primary); font-weight: 600; font-size: 1.1rem;'>
-                                {len(results)} {saved_query} jobs found
-                            </h3>
-                            <p style='margin: 0; color: var(--text-secondary); font-size: 0.9rem;'>
-                                Based on your search criteria
-                            </p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Refinement options - grey text style
-                    st.markdown("""
-                        <div style='margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);'>
-                            <span style='color: var(--text-secondary); font-size: 0.85rem;'>
-                                Refine: 
-                                <a href="?refine=remote" style='color: var(--text-secondary); text-decoration: underline; margin-right: 1rem;'>Remote only</a>
-                                <a href="?refine=location" style='color: var(--text-secondary); text-decoration: underline;'>Change location</a>
-                            </span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Job listings with LinkedIn-style hierarchy
-                    for idx, job in enumerate(results):
-                        # Job listing container
-                        st.markdown(f"""
+    # Show results on same page if we have a query
+    if saved_query:
+        st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+        
+        with st.spinner("Searching..."):
+            results = search_jobs(saved_query, st.session_state.get("user_resume"))
+        
+        if results:
+            # Results container with border
+            st.markdown("""
+                <div style='
+                    border: 1px solid var(--border-color);
+                    border-radius: 10px;
+                    padding: 1.5rem;
+                    background: white;
+                    margin-bottom: 2rem;
+                '>
+            """, unsafe_allow_html=True)
+            
+            # Results header
+            st.markdown(f"""
+                <div style='margin-bottom: 1.5rem;'>
+                    <h3 style='margin: 0 0 0.5rem 0; color: var(--text-primary); font-weight: 600; font-size: 1.1rem;'>
+                        {len(results)} {saved_query} jobs found
+                    </h3>
+                    <p style='margin: 0; color: var(--text-secondary); font-size: 0.9rem;'>
+                        Based on your search criteria
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Refinement options - grey text style
+            st.markdown("""
+                <div style='margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);'>
+                    <span style='color: var(--text-secondary); font-size: 0.85rem;'>
+                        Refine: 
+                        <a href="?refine=remote" style='color: var(--text-secondary); text-decoration: underline; margin-right: 1rem;'>Remote only</a>
+                        <a href="?refine=location" style='color: var(--text-secondary); text-decoration: underline;'>Change location</a>
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Job listings with LinkedIn-style hierarchy
+            for idx, job in enumerate(results):
+                # Job listing container
+                st.markdown(f"""
+                    <div style='
+                        padding: 1rem 0;
+                        border-bottom: 1px solid var(--border-color);
+                        cursor: pointer;
+                        transition: background-color 0.2s ease;
+                    ' onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
+                        <div style='display: flex; align-items: flex-start; gap: 1rem;'>
+                            <!-- Company logo placeholder -->
                             <div style='
-                                padding: 1rem 0;
-                                border-bottom: 1px solid var(--border-color);
-                                cursor: pointer;
-                                transition: background-color 0.2s ease;
-                            ' onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
-                                <div style='display: flex; align-items: flex-start; gap: 1rem;'>
-                                    <!-- Company logo placeholder -->
-                                    <div style='
-                                        width: 48px;
-                                        height: 48px;
-                                        background: var(--accent-primary);
-                                        border-radius: 8px;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        color: white;
-                                        font-weight: 600;
-                                        font-size: 1.2rem;
-                                        flex-shrink: 0;
-                                    '>
-                                        {job.get('company', 'C')[:1].upper()}
-                                    </div>
-                                    
-                                    <!-- Job details -->
-                                    <div style='flex: 1;'>
-                                        <h4 style='
-                                            margin: 0 0 0.5rem 0; 
-                                            color: var(--accent-primary); 
-                                            font-weight: 600; 
-                                            font-size: 1rem;
-                                            line-height: 1.3;
-                                        '>
-                                            {job.get('title', 'Job Title')}
-                                        </h4>
-                                        <p style='
-                                            margin: 0 0 0.5rem 0; 
-                                            color: var(--text-secondary); 
-                                            font-size: 0.9rem;
-                                            line-height: 1.4;
-                                        '>
-                                            {job.get('company', 'Company')} · {job.get('location', 'Location')} · {job.get('type', 'Full-time')}
-                                        </p>
-                                        <p style='
-                                            margin: 0; 
-                                            color: var(--text-secondary); 
-                                            font-size: 0.85rem;
-                                            opacity: 0.8;
-                                        '>
-                                            View details →
-                                        </p>
-                                    </div>
-                                </div>
+                                width: 48px;
+                                height: 48px;
+                                background: var(--accent-primary);
+                                border-radius: 8px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: white;
+                                font-weight: 600;
+                                font-size: 1.2rem;
+                                flex-shrink: 0;
+                            '>
+                                {job.get('company', 'C')[:1].upper()}
                             </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Click handler for job selection
-                        if st.button(f"Select {job.get('title', 'Job')}", key=f"select_job_{idx}", type="primary", use_container_width=True):
-                            st.session_state["selected_job"] = job
-                            st.session_state["current_step"] = "job_detail"
-                            st.rerun()
-                    
-                    # Close results container
-                    st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='margin-top: 2rem; color: var(--text-secondary);'>No jobs found. Try a different search.</div>", unsafe_allow_html=True)
+                            
+                            <!-- Job details -->
+                            <div style='flex: 1;'>
+                                <h4 style='
+                                    margin: 0 0 0.5rem 0; 
+                                    color: var(--accent-primary); 
+                                    font-weight: 600; 
+                                    font-size: 1rem;
+                                    line-height: 1.3;
+                                '>
+                                    {job.get('title', 'Job Title')}
+                                </h4>
+                                <p style='
+                                    margin: 0 0 0.5rem 0; 
+                                    color: var(--text-secondary); 
+                                    font-size: 0.9rem;
+                                    line-height: 1.4;
+                                '>
+                                    {job.get('company', 'Company')} · {job.get('location', 'Location')} · {job.get('type', 'Full-time')}
+                                </p>
+                                <p style='
+                                    margin: 0; 
+                                    color: var(--text-secondary); 
+                                    font-size: 0.85rem;
+                                    opacity: 0.8;
+                                '>
+                                    View details →
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Click handler for job selection
+                if st.button(f"Select {job.get('title', 'Job')}", key=f"select_job_{idx}", type="primary", use_container_width=True):
+                    st.session_state["selected_job"] = job
+                    st.session_state["current_step"] = "job_detail"
+                    st.rerun()
+            
+            # Close results container
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin-top: 2rem; color: var(--text-secondary);'>No jobs found. Try a different search.</div>", unsafe_allow_html=True)
 
 def render_paste_job():
     """Direct job paste interface for users who already have a listing"""
