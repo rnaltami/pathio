@@ -180,6 +180,22 @@ st.markdown("""
         font-weight: 400 !important;
     }
     
+    /* Job row - with top border separator */
+    .job-row {
+        border-top: 1px solid var(--border-color);
+        padding: 1rem 0;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+    }
+    
+    .job-row:hover {
+        opacity: 0.7;
+    }
+    
+    .job-row:first-child {
+        border-top: none;
+    }
+    
     /* Primary button - MINIMAL (no hover fill) */
     .stButton > button[kind="primary"] {
         background-color: transparent !important;
@@ -386,17 +402,25 @@ def render_header():
     """, unsafe_allow_html=True)
 
 def render_landing():
-    """Landing page - Clean, minimal like Perplexity"""
+    """Landing page - Results on same page like Perplexity"""
     render_header()
     
-    # Main search field (no form, just input)
+    # Main search field
     search_query = st.text_input(
         "search",
         placeholder="Search for a job... writer, data scientist, marketing manager",
         label_visibility="collapsed",
-        key="main_search",
-        on_change=lambda: handle_search() if st.session_state.get("main_search") else None
+        key="main_search"
     )
+    
+    # Check if user typed and hit enter or if we have a search query
+    current_search = st.session_state.get("main_search", "").strip()
+    saved_query = st.session_state.get("search_query", "")
+    
+    # If user typed something new, update saved query
+    if current_search and current_search != saved_query:
+        st.session_state["search_query"] = current_search
+        saved_query = current_search
     
     # Alternative actions - plain text links style
     st.markdown("""
@@ -420,12 +444,49 @@ def render_landing():
         st.session_state["current_step"] = "paste_job"
         st.query_params.clear()
         st.rerun()
-
-def handle_search():
-    """Handle search submission"""
-    if st.session_state.get("main_search"):
-        st.session_state["search_query"] = st.session_state["main_search"]
-        st.session_state["current_step"] = "search"
+    
+    # Show results on same page if we have a query
+    if saved_query:
+        st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+        
+        with st.spinner("Searching..."):
+            results = search_jobs(saved_query, st.session_state.get("user_resume"))
+        
+        if results:
+            # Results header
+            st.markdown(f"""
+                <div style='margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);'>
+                    {len(results)} {saved_query} jobs found
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Refinement options
+            st.markdown("""
+                <div style='margin-bottom: 1.5rem; font-size: 0.85rem; color: var(--text-secondary);'>
+                    Refine: <a href="?refine=remote" style='color: var(--text-secondary); text-decoration: underline;'>Remote only</a> • 
+                    <a href="?refine=location" style='color: var(--text-secondary); text-decoration: underline;'>Change location</a>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Job list with border separators
+            for idx, job in enumerate(results):
+                # Clickable job row
+                job_key = f"job_btn_{idx}"
+                if st.button(
+                    f"{job.get('title', 'Job Title')}\n{job.get('company', 'Company')} • {job.get('location', 'Location')} • {job.get('type', 'Full-time')}",
+                    key=job_key,
+                    use_container_width=True,
+                    type="secondary"
+                ):
+                    st.session_state["selected_job"] = job
+                    st.session_state["current_step"] = "job_detail"
+                    st.rerun()
+                
+                # Add visual separator after button
+                if idx < len(results) - 1:
+                    st.markdown("<div style='border-top: 1px solid var(--border-color); margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin-top: 2rem; color: var(--text-secondary);'>No jobs found. Try a different search.</div>", unsafe_allow_html=True)
 
 def render_paste_job():
     """Direct job paste interface for users who already have a listing"""
