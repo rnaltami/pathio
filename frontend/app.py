@@ -173,11 +173,21 @@ st.markdown("""
         opacity: 0.7;
     }
     
-    /* Job title buttons - look like text, no border */
+    /* Job title buttons - look like text, no border, startup blue */
     .stButton > button[kind="secondary"] {
         border: none !important;
         padding: 0.5rem 0 !important;
         font-weight: 400 !important;
+        background: transparent !important;
+        text-align: left !important;
+        color: #2563eb !important;
+        white-space: pre-line !important;
+        line-height: 1.5 !important;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background: transparent !important;
+        opacity: 0.7 !important;
     }
     
     /* Job row - with top border separator */
@@ -578,45 +588,32 @@ def render_search_results():
         </div>
     """, unsafe_allow_html=True)
     
-    # Clean list of jobs (no borders, clickable titles)
+    # Clean list of jobs - each row clickable
     for idx, job in enumerate(results):
         job_title = job.get('title', 'Job Title')
         company = job.get('company', 'Company')
         location = job.get('location', 'Location')
         job_type = job.get('type', 'Full-time')
         
-        # Render job as clickable div with consistent left alignment and startup blue color
-        job_html = f"""
-            <div style='
-                margin-bottom: 1.5rem; 
-                cursor: pointer;
-                text-align: left;
-            ' onclick='this.querySelector("button").click()'>
-                <div style='
-                    font-size: 0.95rem; 
-                    font-weight: 500; 
-                    color: #2563eb;
-                    margin-bottom: 0.3rem;
-                    text-align: left;
-                '>
-                    {job_title}
-                </div>
-                <div style='
-                    font-size: 0.85rem; 
-                    color: var(--text-secondary);
-                    text-align: left;
-                '>
-                    {company} • {location} • {job_type}
-                </div>
-            </div>
-        """
-        st.markdown(job_html, unsafe_allow_html=True)
+        # Create clickable container for entire job
+        cols = st.columns([1])
+        with cols[0]:
+            # Use button but style it to look like plain text
+            button_label = f"{job_title}\n{company} • {location} • {job_type}"
+            
+            if st.button(
+                button_label,
+                key=f"job_{idx}",
+                use_container_width=True,
+                type="secondary"
+            ):
+                st.session_state["selected_job"] = job
+                st.session_state["current_step"] = "job_detail"
+                st.rerun()
         
-        # Hidden button for click handling
-        if st.button("select", key=f"job_{idx}", label_visibility="collapsed"):
-            st.session_state["selected_job"] = job
-            st.session_state["current_step"] = "job_detail"
-            st.rerun()
+        # Add separator between jobs
+        if idx < len(results) - 1:
+            st.markdown("<div style='border-top: 1px solid var(--border-color); margin: 1rem 0;'></div>", unsafe_allow_html=True)
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
