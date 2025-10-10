@@ -187,10 +187,8 @@ def fetch_jsearch_jobs(query: str, location: str = None, page: int = 1, num_page
             # Transform to our format
             results = []
             for job in jobs_data:
-                # Clean up description
+                # Clean up description - keep full description (JSearch provides good ones)
                 description = job.get("job_description", "")
-                if description and len(description) > 500:
-                    description = description[:500] + "..."
                 
                 # Extract requirements from description or qualifications
                 requirements = []
