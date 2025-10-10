@@ -881,7 +881,7 @@ def render_apply_direct():
                     )
             else:
                 st.error("Unable to tailor application.")
-                except Exception as e:
+        except Exception as e:
             st.error(f"Error: {e}")
 
 # =========================
