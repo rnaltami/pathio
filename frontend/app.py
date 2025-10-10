@@ -813,7 +813,7 @@ def render_apply():
                 with tab3:
                     st.markdown(data.get("what_changed_md", "No changes noted."))
 
-        st.markdown("---")
+                st.markdown("---")
                 st.download_button(
                     "Download Resume",
                     data=data.get("tailored_resume_md", ""),
