@@ -580,23 +580,43 @@ def render_search_results():
     
     # Clean list of jobs (no borders, clickable titles)
     for idx, job in enumerate(results):
-        # Make the whole job title clickable
-        if st.button(
-            job.get('title', 'Job Title'),
-            key=f"job_{idx}",
-            help=f"{job.get('company')} • {job.get('location')}",
-            use_container_width=True
-        ):
+        job_title = job.get('title', 'Job Title')
+        company = job.get('company', 'Company')
+        location = job.get('location', 'Location')
+        job_type = job.get('type', 'Full-time')
+        
+        # Render job as clickable div with consistent left alignment and startup blue color
+        job_html = f"""
+            <div style='
+                margin-bottom: 1.5rem; 
+                cursor: pointer;
+                text-align: left;
+            ' onclick='this.querySelector("button").click()'>
+                <div style='
+                    font-size: 0.95rem; 
+                    font-weight: 500; 
+                    color: #2563eb;
+                    margin-bottom: 0.3rem;
+                    text-align: left;
+                '>
+                    {job_title}
+                </div>
+                <div style='
+                    font-size: 0.85rem; 
+                    color: var(--text-secondary);
+                    text-align: left;
+                '>
+                    {company} • {location} • {job_type}
+                </div>
+            </div>
+        """
+        st.markdown(job_html, unsafe_allow_html=True)
+        
+        # Hidden button for click handling
+        if st.button("select", key=f"job_{idx}", label_visibility="collapsed"):
             st.session_state["selected_job"] = job
             st.session_state["current_step"] = "job_detail"
             st.rerun()
-        
-        # Company and location below (subtle)
-        st.markdown(f"""
-            <div style='margin: -0.5rem 0 1rem 0; font-size: 0.85rem; color: var(--text-secondary);'>
-                {job.get('company', 'Company')} • {job.get('location', 'Location')} • {job.get('type', 'Full-time')}
-            </div>
-        """, unsafe_allow_html=True)
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
