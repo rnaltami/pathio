@@ -163,13 +163,21 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 0.5rem 1rem !important;
         font-weight: 400 !important;
-        font-size: 0.85rem !important;
-        transition: border-color 0.2s ease !important;
+        font-size: 0.95rem !important;
+        transition: opacity 0.2s ease !important;
         cursor: pointer !important;
+        text-align: left !important;
     }
     
     .stButton > button:hover {
-        border-color: var(--text-primary) !important;
+        opacity: 0.7;
+    }
+    
+    /* Job title buttons - look like text, no border */
+    .stButton > button[kind="secondary"] {
+        border: none !important;
+        padding: 0.5rem 0 !important;
+        font-weight: 400 !important;
     }
     
     /* Primary button - MINIMAL (no hover fill) */
@@ -470,43 +478,64 @@ def render_paste_job():
                 st.warning("Please paste both job listing and resume")
 
 def render_search_results():
-    """Display job search results - COMPACT"""
+    """Display job search results - PERPLEXITY STYLE"""
     query = st.session_state.get("search_query", "")
     
-    # Compact header
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        if st.button("← Back"):
-            st.session_state["current_step"] = "landing"
-            st.rerun()
-    with col2:
-        st.markdown(f"<div style='font-size: 0.95rem; padding-top: 0.3rem;'><strong>{query}</strong></div>", unsafe_allow_html=True)
+    # Clean back link (no border)
+    st.markdown("""
+        <a href="?back=true" style='color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;'>
+            ← Back to search
+        </a>
+    """, unsafe_allow_html=True)
+    
+    # Handle back action
+    if st.query_params.get("back") == "true":
+        st.session_state["current_step"] = "landing"
+        st.query_params.clear()
+        st.rerun()
     
     # Search results
     with st.spinner("Searching..."):
         results = search_jobs(query, st.session_state.get("user_resume"))
-        
+    
     if not results:
-        st.info("No jobs found. Try a different search.")
+        st.markdown("<div style='margin-top: 2rem;'>No jobs found. Try a different search.</div>", unsafe_allow_html=True)
         return
     
-    st.markdown(f"<div style='font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0;'>{len(results)} jobs found</div>", unsafe_allow_html=True)
+    # Results header
+    st.markdown(f"""
+        <div style='margin: 1.5rem 0 1rem 0; font-size: 0.9rem; color: var(--text-secondary);'>
+            {len(results)} {query} jobs found
+        </div>
+    """, unsafe_allow_html=True)
     
+    # Refinement options (conversational)
+    st.markdown("""
+        <div style='margin-bottom: 2rem; font-size: 0.85rem; color: var(--text-secondary);'>
+            Refine: <a href="?refine=remote" style='color: var(--text-secondary); text-decoration: underline;'>Remote only</a> • 
+            <a href="?refine=location" style='color: var(--text-secondary); text-decoration: underline;'>Change location</a>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Clean list of jobs (no borders, clickable titles)
     for idx, job in enumerate(results):
-        with st.container():
-            st.markdown(f"""
-                <div class="job-card">
-                    <h3>{job.get('title', 'Job Title')}</h3>
-                    <p style="color: var(--text-secondary);">
-                        {job.get('company', 'Company')} • {job.get('location', 'Location')}
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("View", key=f"view_{idx}", use_container_width=False):
-                st.session_state["selected_job"] = job
-                st.session_state["current_step"] = "job_detail"
-                st.rerun()
+        # Make the whole job title clickable
+        if st.button(
+            job.get('title', 'Job Title'),
+            key=f"job_{idx}",
+            help=f"{job.get('company')} • {job.get('location')}",
+            use_container_width=True
+        ):
+            st.session_state["selected_job"] = job
+            st.session_state["current_step"] = "job_detail"
+            st.rerun()
+        
+        # Company and location below (subtle)
+        st.markdown(f"""
+            <div style='margin: -0.5rem 0 1rem 0; font-size: 0.85rem; color: var(--text-secondary);'>
+                {job.get('company', 'Company')} • {job.get('location', 'Location')} • {job.get('type', 'Full-time')}
+            </div>
+        """, unsafe_allow_html=True)
 
 def render_career_chat():
     """Career exploration chat interface - CONTAINED"""
