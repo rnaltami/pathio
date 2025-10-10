@@ -26,6 +26,7 @@ _env_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") i
 default_origins = [
     "https://pathio.streamlit.app",  # Streamlit fallback frontend
     "http://localhost:8501",         # local Streamlit dev
+    "http://localhost:3000",         # local React/Next.js dev
 ]
 allow_origins = _env_origins or default_origins
 
