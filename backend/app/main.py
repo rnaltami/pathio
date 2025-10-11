@@ -24,10 +24,11 @@ app = FastAPI(title="Pathio Backend")
 # =========================
 _env_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 default_origins = [
-    "https://pathio.streamlit.app",  # Streamlit fallback frontend
-    "http://localhost:8501",         # local Streamlit dev
-    "http://localhost:3000",         # local React/Next.js dev
-    "http://localhost:3001",         # local React/Next.js dev (alternative port)
+    "https://pathio.streamlit.app",      # Streamlit fallback frontend
+    "https://pathio-frontend.onrender.com",  # React production frontend
+    "http://localhost:8501",             # local Streamlit dev
+    "http://localhost:3000",             # local React/Next.js dev
+    "http://localhost:3001",             # local React/Next.js dev (alternative port)
 ]
 allow_origins = _env_origins or default_origins
 
