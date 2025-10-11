@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '../config';
 
 interface Job {
   title: string;
@@ -34,7 +35,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        'https://pathio-c9yz.onrender.com/search-jobs',
+        `${API_URL}/search-jobs`,
         {
           method: 'POST',
           headers: {
@@ -271,7 +272,7 @@ export default function Home() {
                                     className="block w-full px-4 py-3 text-center text-[0.9rem] bg-[#2563eb] text-white rounded-lg hover:opacity-90 transition-opacity"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    Apply on {job.company}'s site →
+                                    Apply Now →
                                   </a>
                                 )}
                                 
@@ -283,7 +284,7 @@ export default function Home() {
                                   }}
                                   className="block w-full px-4 py-3 text-center text-[0.9rem] border border-[#2563eb] text-[#2563eb] rounded-lg hover:bg-[#2563eb] hover:text-white transition-all"
                                 >
-                                  Help me get this job →
+                                  Help me get hired →
                                 </button>
                               </div>
                             </div>
