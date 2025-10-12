@@ -352,14 +352,17 @@ def call_llm_better_candidate(resume_text: str, job_text: str) -> list[dict]:
     if not _client or not OPENAI_API_KEY:
         return []
     system = (
-        "You are a career coach. Based ONLY on the job description and the source resume, "
-        "describe what top applicants for this role typically have that this resume lacks, "
-        "then propose 3–6 specific, practical actions the candidate can do in 1–6 weeks to build toward that skillset. "
-        "Actions must be concrete and practice-oriented (e.g., produce X artifact, complete Y exercise, ship Z demo). "
-        "Avoid fabrications and obscure providers; prefer widely recognized tools/platforms. "
-        "No generic platitudes like 'improve communication'. "
-        "Output ONLY JSON in this shape: "
-        "[{\"title\":\"...\",\"why\":\"...\",\"steps\":[\"...\",\"...\"]}, ...]"
+        "You are a career coach. Analyze the job description and resume to identify gaps. "
+        "Generate 5 specific, actionable tasks:\n\n"
+        "IMMEDIATE (timeframe='now') - 3 tasks doable TODAY (1-4 hours each):\n"
+        "- Create/write a TANGIBLE work sample using existing skills (e.g., write sample SOP, edit existing doc, create process diagram)\n"
+        "- Draft/prepare a SPECIFIC deliverable mentioned in the job (e.g., user guide, technical spec, workflow doc)\n"
+        "- Quantify or improve an existing achievement from their resume\n"
+        "AVOID: Generic advice like 'research company' or 'update LinkedIn'\n\n"
+        "LONGER-TERM (timeframe='later') - 2 tasks for skill-building (1-4 weeks):\n"
+        "- Learn SPECIFIC missing tool/skill from job requirements\n"
+        "- Build portfolio project demonstrating key requirement\n\n"
+        "Output valid JSON ONLY: [{\"title\":\"Create a sample SOP for...\",\"timeframe\":\"now\"}, ...]"
     )
     user = f"JOB DESCRIPTION:\n{job_text}\n\nRESUME (verbatim):\n{resume_text}\n"
     raw = _chat(
@@ -487,7 +490,37 @@ def quick_tailor(req: QuickTailorRequest):
 
     # Score against extracted required phrases
     score, missing, used = _score_and_missing_hybrid(resume_text, job_text)
-    do_now, do_long = _actions_from_missing(missing, job_text=job_text)
+    
+    # Use AI to generate job-specific action items
+    ai_actions = call_llm_better_candidate(resume_text, job_text)
+    
+    # Extract do_now and do_long from AI response based on timeframe
+    if ai_actions and len(ai_actions) > 0:
+        do_now = []
+        do_long = []
+        
+        for action in ai_actions:
+            if isinstance(action, dict):
+                title = action.get('title', '')
+                timeframe = action.get('timeframe', 'now').lower()
+                
+                if timeframe == 'now':
+                    do_now.append(title)
+                else:
+                    do_long.append(title)
+        
+        # If parsing failed or empty, use fallback
+        if not do_now and not do_long:
+            # Try splitting by position (first 3 = now, rest = later)
+            for action in ai_actions[:3]:
+                if isinstance(action, dict):
+                    do_now.append(action.get('title', ''))
+            for action in ai_actions[3:]:
+                if isinstance(action, dict):
+                    do_long.append(action.get('title', ''))
+    else:
+        # Fallback to heuristic if AI fails
+        do_now, do_long = _actions_from_missing(missing, job_text=job_text)
 
     return {
         "tailored_resume_md": tailored_md if llm_ok else "",

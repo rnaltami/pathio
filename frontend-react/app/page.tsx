@@ -77,7 +77,7 @@ export default function Home() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for a job... writer, data scientist, marketing manager"
-              className="w-full px-4 py-3 text-[0.95rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0] transition-none"
+              className="w-full px-4 py-3 pr-24 text-[0.95rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0] transition-none"
             />
             <button
               type="submit"

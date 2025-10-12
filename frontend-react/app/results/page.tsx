@@ -24,9 +24,12 @@ interface TailoredResults {
 export default function ResultsPage() {
   const router = useRouter();
   const [results, setResults] = useState<TailoredResults | null>(null);
+  const [originalResume, setOriginalResume] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'resume' | 'cover' | 'changes' | 'tasks'>('resume');
-  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{role: string, content: string}>>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatInput, setChatInput] = useState('');
 
   useEffect(() => {
     // Load results from localStorage
@@ -38,157 +41,107 @@ export default function ResultsPage() {
       console.log('Cover letter:', data.cover_letter_md);
       console.log('What changed:', data.what_changed_md);
       setResults(data);
+      // Store original resume for export
+      setOriginalResume(data.tailored_resume_md);
     } else {
       // No results, redirect to home
       router.push('/');
     }
   }, [router]);
 
-  const extractSkillsFromTask = (task: string): string[] => {
-    // Extract skills from common task patterns
-    const skillPatterns = [
-      /add|include|mention|highlight.*?(?:skills?|technologies?|tools?)[:\s]+([^.]+)/i,
-      /experience with ([^.]+)/i,
-      /knowledge of ([^.]+)/i,
-      /proficiency in ([^.]+)/i,
-    ];
+  const handleShowMeHow = async (task: string) => {
+    setActiveChat(task);
+    const initialMessages = [{
+      role: 'user',
+      content: `How do I complete this task: ${task}`
+    }];
+    setChatMessages(initialMessages);
+    setChatLoading(true);
 
-    for (const pattern of skillPatterns) {
-      const match = task.match(pattern);
-      if (match) {
-        // Split by common separators and clean up
-        return match[1]
-          .split(/,|and|\||&/)
-          .map(s => s.trim())
-          .filter(s => s.length > 2 && s.length < 30);
-      }
+    try {
+      const response = await fetch(`${API_URL}/coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'You are a helpful career coach. Provide specific, actionable guidance.' },
+            ...initialMessages
+          ]
+        })
+      });
+
+      const data = await response.json();
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply || 'Sorry, I could not generate a response.'
+      }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, there was an error. Please try again.'
+      }]);
+    } finally {
+      setChatLoading(false);
     }
-
-    return [];
   };
 
-  const updateResumeWithTask = (resume: string, task: string, completedTasksList: Set<string>): string => {
-    const skills = extractSkillsFromTask(task);
-    let updatedResume = resume;
-    const lines = resume.split('\n');
-    
-    // Find or create "Job-Specific Highlights" section at the top (after summary/name)
-    let highlightsSectionIndex = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (/^#{1,3}\s*Job-Specific Highlights/i.test(lines[i])) {
-        highlightsSectionIndex = i;
-        break;
-      }
+  const handleChatSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userMessage = { role: 'user', content: chatInput };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'You are a helpful career coach. Provide specific, actionable guidance.' },
+            ...chatMessages,
+            userMessage
+          ]
+        })
+      });
+
+      const data = await response.json();
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply || 'Sorry, I could not generate a response.'
+      }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, there was an error. Please try again.'
+      }]);
+    } finally {
+      setChatLoading(false);
     }
-
-    // Collect all completed tasks with their extracted skills
-    const allCompletedTasks = Array.from(completedTasksList);
-    const allSkills: string[] = [];
-    
-    allCompletedTasks.forEach(t => {
-      const taskSkills = extractSkillsFromTask(t);
-      allSkills.push(...taskSkills);
-    });
-
-    if (highlightsSectionIndex === -1) {
-      // Create new section after the first heading (usually name) or after summary
-      let insertIndex = 3; // Default after name
-      for (let i = 0; i < lines.length; i++) {
-        if (/^#{1,3}\s*(?:Experience|Work Experience|Professional Experience|Relevant Skills)/i.test(lines[i])) {
-          insertIndex = i;
-          break;
-        }
-      }
-      
-      const highlightsContent = [
-        '',
-        '### Job-Specific Highlights',
-        '',
-      ];
-
-      // Show unique skills from all completed tasks
-      if (allSkills.length > 0) {
-        const uniqueSkills = Array.from(new Set(allSkills));
-        highlightsContent.push(`✓ Additional Skills: ${uniqueSkills.join(' • ')}`);
-      }
-
-      // Show completed tasks
-      highlightsContent.push(`✓ Completed ${allCompletedTasks.length} improvement${allCompletedTasks.length > 1 ? 's' : ''} to strengthen this application`);
-      highlightsContent.push('');
-      
-      lines.splice(insertIndex, 0, ...highlightsContent);
-    } else {
-      // Update existing highlights section
-      // Find the end of the section
-      let sectionEnd = highlightsSectionIndex + 1;
-      while (sectionEnd < lines.length && !lines[sectionEnd].match(/^#{1,3}\s/)) {
-        sectionEnd++;
-      }
-
-      // Replace section content
-      const newContent = [''];
-      if (allSkills.length > 0) {
-        const uniqueSkills = Array.from(new Set(allSkills));
-        newContent.push(`✓ Additional Skills: ${uniqueSkills.join(' • ')}`);
-      }
-      newContent.push(`✓ Completed ${allCompletedTasks.length} improvement${allCompletedTasks.length > 1 ? 's' : ''} to strengthen this application`);
-      newContent.push('');
-
-      lines.splice(highlightsSectionIndex + 1, sectionEnd - highlightsSectionIndex - 1, ...newContent);
-    }
-
-    return lines.join('\n');
-  };
-
-  const handleTaskComplete = async (task: string, isDoNow: boolean) => {
-    if (!results) return;
-
-    const newCompleted = new Set(completedTasks);
-    if (newCompleted.has(task)) {
-      newCompleted.delete(task);
-      setCompletedTasks(newCompleted);
-      return;
-    }
-
-    newCompleted.add(task);
-    setCompletedTasks(newCompleted);
-
-    // Update the resume organically
-    setIsUpdating(true);
-    
-    // Small delay to show the "updating" message
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const updatedResume = updateResumeWithTask(results.tailored_resume_md, task, newCompleted);
-    
-    const updatedResults = {
-      ...results,
-      tailored_resume_md: updatedResume,
-    };
-
-    setResults(updatedResults);
-    
-    // Save to localStorage
-    localStorage.setItem('tailoredResults', JSON.stringify(updatedResults));
-    
-    setIsUpdating(false);
-    
-    // Auto-switch to resume tab to show the changes
-    setActiveTab('resume');
   };
 
   const handleExport = async (type: 'resume' | 'cover') => {
     if (!results) return;
 
     try {
+      const contentToExport = type === 'resume' 
+        ? (originalResume || results.tailored_resume_md)
+        : results.cover_letter_md;
+      
+      console.log('Exporting:', type);
+      console.log('Content length:', contentToExport.length);
+      console.log('First 200 chars:', contentToExport.substring(0, 200));
+
       const response = await fetch(`${API_URL}/export`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tailored_resume_md: results.tailored_resume_md,
-          cover_letter_md: results.cover_letter_md,
+          tailored_resume_md: type === 'resume' ? contentToExport : '',
+          cover_letter_md: type === 'cover' ? contentToExport : '',
           which: type,
         }),
       });
@@ -233,6 +186,14 @@ export default function ResultsPage() {
           </a>
         </header>
 
+        {/* Back Button */}
+        <button
+          onClick={() => router.push('/')}
+          className="mb-6 text-[0.85rem] text-[#707070] hover:text-[#303030] transition-colors flex items-center gap-1"
+        >
+          ← Back to job search
+        </button>
+
         {/* Title */}
         <div className="mb-8">
           <h2 className="text-xl font-medium text-[#202020] mb-2">
@@ -248,7 +209,10 @@ export default function ResultsPage() {
         <div className="mb-6 border-b border-[#E0E0E0]">
           <div className="flex gap-6 overflow-x-auto">
             <button
-              onClick={() => setActiveTab('resume')}
+              onClick={() => {
+                setActiveTab('resume');
+                setActiveChat(null);
+              }}
               className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
                 activeTab === 'resume'
                   ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
@@ -258,7 +222,10 @@ export default function ResultsPage() {
               Tailored Resume
             </button>
             <button
-              onClick={() => setActiveTab('cover')}
+              onClick={() => {
+                setActiveTab('cover');
+                setActiveChat(null);
+              }}
               className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
                 activeTab === 'cover'
                   ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
@@ -268,7 +235,10 @@ export default function ResultsPage() {
               Cover Letter
             </button>
             <button
-              onClick={() => setActiveTab('changes')}
+              onClick={() => {
+                setActiveTab('changes');
+                setActiveChat(null);
+              }}
               className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
                 activeTab === 'changes'
                   ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
@@ -278,7 +248,10 @@ export default function ResultsPage() {
               What Changed
             </button>
             <button
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => {
+                setActiveTab('tasks');
+                setActiveChat(null);
+              }}
               className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
                 activeTab === 'tasks'
                   ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
@@ -330,30 +303,22 @@ export default function ResultsPage() {
               {results.insights.do_now && results.insights.do_now.length > 0 && (
                 <div className="p-6 bg-[#FAFAFA] rounded-lg">
                   <h3 className="text-[0.95rem] font-medium text-[#202020] mb-4">
-                    📋 Do Before Applying {isUpdating && <span className="text-[0.8rem] text-[#2563eb]">(Updating resume...)</span>}
+                    📋 Do Before Applying
                   </h3>
                   <ul className="space-y-4">
                     {results.insights.do_now.map((task, idx) => (
                       <li key={idx} className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={completedTasks.has(task)}
-                          onChange={() => handleTaskComplete(task, true)}
-                          className="mt-1 w-4 h-4 text-[#2563eb] border-gray-300 rounded focus:ring-[#2563eb] cursor-pointer flex-shrink-0"
-                        />
+                        <span className="text-[#303030] text-[0.85rem] mt-0.5">•</span>
                         <div className="flex-1">
-                          <span className={`text-[0.85rem] block mb-1 ${completedTasks.has(task) ? 'line-through text-[#707070]' : 'text-[#303030]'}`}>
+                          <span className="text-[0.85rem] block mb-1 text-[#303030]">
                             {task}
                           </span>
-                          {!completedTasks.has(task) && (
-                            <a
-                              href={`/chat?task=${encodeURIComponent(task)}`}
-                              className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Show me how →
-                            </a>
-                          )}
+                          <button
+                            onClick={() => handleShowMeHow(task)}
+                            className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
+                          >
+                            Show me how →
+                          </button>
                         </div>
                       </li>
                     ))}
@@ -373,25 +338,17 @@ export default function ResultsPage() {
                   <ul className="space-y-4">
                     {results.insights.do_long.map((task, idx) => (
                       <li key={idx} className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={completedTasks.has(task)}
-                          onChange={() => handleTaskComplete(task, false)}
-                          className="mt-1 w-4 h-4 text-[#2563eb] border-gray-300 rounded focus:ring-[#2563eb] cursor-pointer flex-shrink-0"
-                        />
+                        <span className="text-[#303030] text-[0.85rem] mt-0.5">•</span>
                         <div className="flex-1">
-                          <span className={`text-[0.85rem] block mb-1 ${completedTasks.has(task) ? 'line-through text-[#707070]' : 'text-[#303030]'}`}>
+                          <span className="text-[0.85rem] block mb-1 text-[#303030]">
                             {task}
                           </span>
-                          {!completedTasks.has(task) && (
-                            <a
-                              href={`/chat?task=${encodeURIComponent(task)}`}
-                              className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Show me how →
-                            </a>
-                          )}
+                          <button
+                            onClick={() => handleShowMeHow(task)}
+                            className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
+                          >
+                            Show me how →
+                          </button>
                         </div>
                       </li>
                     ))}
@@ -412,14 +369,70 @@ export default function ResultsPage() {
               Download {activeTab === 'resume' ? 'Resume' : 'Cover Letter'} (.docx) →
             </button>
           )}
-
-          <button
-            onClick={() => router.push('/')}
-            className="w-full px-4 py-3 text-center text-[0.95rem] border border-[#E0E0E0] text-[#303030] rounded-lg hover:bg-[#F5F5F5] transition-colors"
-          >
-            Search for More Jobs
-          </button>
         </div>
+
+        {/* Inline Chat Section */}
+        {activeChat && (
+          <div className="mt-12 pt-8 border-t border-[#E0E0E0]">
+            <div className="mb-6">
+              <h3 className="text-[1rem] font-medium text-[#202020] mb-2">
+                How to Complete This Task
+              </h3>
+              <p className="text-[0.85rem] text-[#707070] mb-4">
+                {activeChat}
+              </p>
+              <button
+                onClick={() => setActiveChat(null)}
+                className="text-[0.8rem] text-[#707070] hover:text-[#303030] transition-colors"
+              >
+                ← Close
+              </button>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="space-y-4 mb-6">
+              {chatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`${
+                    msg.role === 'user'
+                      ? 'ml-12 bg-[#F5F5F5]'
+                      : 'mr-12 bg-white border border-[#E0E0E0]'
+                  } p-4 rounded-lg`}
+                >
+                  <p className="text-[0.85rem] text-[#303030] whitespace-pre-wrap leading-relaxed">
+                    {msg.content}
+                  </p>
+                </div>
+              ))}
+              
+              {chatLoading && (
+                <div className="mr-12 bg-white border border-[#E0E0E0] p-4 rounded-lg">
+                  <p className="text-[0.85rem] text-[#707070]">Thinking...</p>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleChatSend} className="space-y-3">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask a follow-up question..."
+                disabled={chatLoading}
+                className="w-full px-4 py-3 text-[0.9rem] border border-[#D0D0D0] rounded-lg focus:outline-none focus:border-[#D0D0D0] disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || chatLoading}
+                className="w-full px-4 py-2.5 text-[0.9rem] bg-[#2563eb] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </main>
   );
