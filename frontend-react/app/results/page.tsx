@@ -176,11 +176,11 @@ export default function ResultsPage() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-[680px] mx-auto px-4 py-8">
+      <div className="max-w-[720px] mx-auto px-4 pt-16 pb-8">
         {/* Header */}
-        <header className="text-center mb-12">
+        <header className="text-center mb-16">
           <a href="/">
-            <h1 className="text-3xl font-normal text-[#303030] tracking-tight cursor-pointer hover:opacity-70 transition-opacity">
+            <h1 className="text-[2rem] font-light text-[#202020] tracking-tight cursor-pointer hover:opacity-60 transition-opacity">
               pathio
             </h1>
           </a>
@@ -189,47 +189,36 @@ export default function ResultsPage() {
         {/* Back Button */}
         <button
           onClick={() => router.push('/')}
-          className="mb-6 text-[0.85rem] text-[#707070] hover:text-[#303030] transition-colors flex items-center gap-1"
+          className="mb-8 text-[0.85rem] text-[#909090] hover:text-[#505050] transition-colors"
         >
-          ← Back to job search
+          ← Back
         </button>
 
-        {/* Title */}
-        <div className="mb-8">
-          <h2 className="text-xl font-medium text-[#202020] mb-2">
-            Your Tailored Application Materials
-          </h2>
-          <p className="text-[0.9rem] text-[#707070]">
-            Review and download your personalized resume and cover letter
-          </p>
-        </div>
-
-
-        {/* Tabs */}
-        <div className="mb-6 border-b border-[#E0E0E0]">
-          <div className="flex gap-6 overflow-x-auto">
+        {/* Tabs - Minimal style */}
+        <div className="mb-10">
+          <div className="flex gap-4 overflow-x-auto border-b border-[#F0F0F0]">
             <button
               onClick={() => {
                 setActiveTab('resume');
                 setActiveChat(null);
               }}
-              className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
+              className={`pb-3 text-[0.85rem] transition-colors whitespace-nowrap ${
                 activeTab === 'resume'
-                  ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
-                  : 'text-[#707070] hover:text-[#303030]'
+                  ? 'text-[#202020] border-b-2 border-[#202020]'
+                  : 'text-[#909090] hover:text-[#505050]'
               }`}
             >
-              Tailored Resume
+              Resume
             </button>
             <button
               onClick={() => {
                 setActiveTab('cover');
                 setActiveChat(null);
               }}
-              className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
+              className={`pb-3 text-[0.85rem] transition-colors whitespace-nowrap ${
                 activeTab === 'cover'
-                  ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
-                  : 'text-[#707070] hover:text-[#303030]'
+                  ? 'text-[#202020] border-b-2 border-[#202020]'
+                  : 'text-[#909090] hover:text-[#505050]'
               }`}
             >
               Cover Letter
@@ -239,34 +228,34 @@ export default function ResultsPage() {
                 setActiveTab('changes');
                 setActiveChat(null);
               }}
-              className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
+              className={`pb-3 text-[0.85rem] transition-colors whitespace-nowrap ${
                 activeTab === 'changes'
-                  ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
-                  : 'text-[#707070] hover:text-[#303030]'
+                  ? 'text-[#202020] border-b-2 border-[#202020]'
+                  : 'text-[#909090] hover:text-[#505050]'
               }`}
             >
-              What Changed
+              Changes
             </button>
             <button
               onClick={() => {
                 setActiveTab('tasks');
                 setActiveChat(null);
               }}
-              className={`pb-3 text-[0.9rem] transition-colors whitespace-nowrap ${
+              className={`pb-3 text-[0.85rem] transition-colors whitespace-nowrap ${
                 activeTab === 'tasks'
-                  ? 'text-[#2563eb] border-b-2 border-[#2563eb]'
-                  : 'text-[#707070] hover:text-[#303030]'
+                  ? 'text-[#202020] border-b-2 border-[#202020]'
+                  : 'text-[#909090] hover:text-[#505050]'
               }`}
             >
-              How to Stand Out
+              Stand Out
             </button>
           </div>
         </div>
 
         {/* Content Display */}
-        <div className="mb-6">
+        <div className="mb-8">
           {(activeTab === 'resume' || activeTab === 'cover' || activeTab === 'changes') && (
-            <div className="p-6 bg-[#FAFAFA] rounded-lg">
+            <div className="py-4">
               <pre className="whitespace-pre-wrap text-[0.85rem] text-[#303030] font-sans leading-relaxed">
                 {activeTab === 'resume' && results.tailored_resume_md
                   .replace(/###\s*/g, '')
@@ -291,35 +280,30 @@ export default function ResultsPage() {
           )}
 
           {activeTab === 'tasks' && results.insights && (
-            <div className="space-y-6">
-              {/* Intro explanation */}
-              <div className="p-4 bg-[#F0F7FF] border border-[#D0E7FF] rounded-lg">
-                <p className="text-[0.85rem] text-[#303030]">
-                  Want to be a stronger candidate? Complete these tasks to improve your chances of landing this role.
-                </p>
-              </div>
+            <div className="py-4 space-y-10">
+              {/* Intro - Minimal */}
+              <p className="text-[0.9rem] text-[#606060] leading-relaxed">
+                Complete these tasks to strengthen your application and stand out from other candidates.
+              </p>
 
               {/* Do Now Tasks */}
               {results.insights.do_now && results.insights.do_now.length > 0 && (
-                <div className="p-6 bg-[#FAFAFA] rounded-lg">
-                  <h3 className="text-[0.95rem] font-medium text-[#202020] mb-4">
-                    📋 Do Before Applying
+                <div>
+                  <h3 className="text-[0.95rem] font-normal text-[#202020] mb-5">
+                    Do today (1-4 hours)
                   </h3>
-                  <ul className="space-y-4">
+                  <ul className="space-y-5">
                     {results.insights.do_now.map((task, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <span className="text-[#303030] text-[0.85rem] mt-0.5">•</span>
-                        <div className="flex-1">
-                          <span className="text-[0.85rem] block mb-1 text-[#303030]">
-                            {task}
-                          </span>
-                          <button
-                            onClick={() => handleShowMeHow(task)}
-                            className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
-                          >
-                            Show me how →
-                          </button>
+                      <li key={idx} className="pl-5 border-l-2 border-[#F0F0F0]">
+                        <div className="text-[0.9rem] text-[#303030] mb-2 leading-relaxed">
+                          {task}
                         </div>
+                        <button
+                          onClick={() => handleShowMeHow(task)}
+                          className="text-[0.8rem] text-[#2563eb] hover:text-[#1a4fd6] transition-colors"
+                        >
+                          Show me how →
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -328,28 +312,25 @@ export default function ResultsPage() {
 
               {/* Long-term Tasks */}
               {results.insights.do_long && results.insights.do_long.length > 0 && (
-                <div className="p-6 bg-[#FAFAFA] rounded-lg">
-                  <h3 className="text-[0.95rem] font-medium text-[#202020] mb-4">
-                    🎯 Longer-term Goals
+                <div>
+                  <h3 className="text-[0.95rem] font-normal text-[#202020] mb-2">
+                    Do this month (1-4 weeks)
                   </h3>
-                  <p className="text-[0.8rem] text-[#707070] mb-4">
-                    These take more time but will significantly boost your profile
+                  <p className="text-[0.8rem] text-[#909090] mb-5">
+                    These will significantly boost your profile
                   </p>
-                  <ul className="space-y-4">
+                  <ul className="space-y-5">
                     {results.insights.do_long.map((task, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <span className="text-[#303030] text-[0.85rem] mt-0.5">•</span>
-                        <div className="flex-1">
-                          <span className="text-[0.85rem] block mb-1 text-[#303030]">
-                            {task}
-                          </span>
-                          <button
-                            onClick={() => handleShowMeHow(task)}
-                            className="text-[0.8rem] text-[#2563eb] hover:opacity-70 transition-opacity"
-                          >
-                            Show me how →
-                          </button>
+                      <li key={idx} className="pl-5 border-l-2 border-[#F0F0F0]">
+                        <div className="text-[0.9rem] text-[#303030] mb-2 leading-relaxed">
+                          {task}
                         </div>
+                        <button
+                          onClick={() => handleShowMeHow(task)}
+                          className="text-[0.8rem] text-[#2563eb] hover:text-[#1a4fd6] transition-colors"
+                        >
+                          Show me how →
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -360,33 +341,28 @@ export default function ResultsPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3">
-          {(activeTab === 'resume' || activeTab === 'cover') && (
-            <button
-              onClick={() => handleExport(activeTab)}
-              className="w-full px-4 py-3 text-center text-[0.95rem] bg-[#2563eb] text-white rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Download {activeTab === 'resume' ? 'Resume' : 'Cover Letter'} (.docx) →
-            </button>
-          )}
-        </div>
+        {(activeTab === 'resume' || activeTab === 'cover') && (
+          <button
+            onClick={() => handleExport(activeTab)}
+            className="px-6 py-3 text-[0.9rem] bg-[#202020] text-white rounded-full hover:opacity-80 transition-opacity"
+          >
+            Download {activeTab === 'resume' ? 'resume' : 'cover letter'}
+          </button>
+        )}
 
         {/* Inline Chat Section */}
         {activeChat && (
-          <div className="mt-12 pt-8 border-t border-[#E0E0E0]">
+          <div className="mt-12 pt-10 border-t border-[#F0F0F0]">
             <div className="mb-6">
-              <h3 className="text-[1rem] font-medium text-[#202020] mb-2">
-                How to Complete This Task
-              </h3>
-              <p className="text-[0.85rem] text-[#707070] mb-4">
-                {activeChat}
-              </p>
               <button
                 onClick={() => setActiveChat(null)}
-                className="text-[0.8rem] text-[#707070] hover:text-[#303030] transition-colors"
+                className="text-[0.8rem] text-[#909090] hover:text-[#505050] transition-colors mb-4"
               >
                 ← Close
               </button>
+              <p className="text-[0.85rem] text-[#606060] leading-relaxed">
+                {activeChat}
+              </p>
             </div>
 
             {/* Chat Messages */}
@@ -396,37 +372,41 @@ export default function ResultsPage() {
                   key={idx}
                   className={`${
                     msg.role === 'user'
-                      ? 'ml-12 bg-[#F5F5F5]'
-                      : 'mr-12 bg-white border border-[#E0E0E0]'
-                  } p-4 rounded-lg`}
+                      ? 'text-right'
+                      : ''
+                  }`}
                 >
-                  <p className="text-[0.85rem] text-[#303030] whitespace-pre-wrap leading-relaxed">
-                    {msg.content}
-                  </p>
+                  <div className={`inline-block max-w-[85%] ${
+                    msg.role === 'user'
+                      ? 'bg-[#F8F8F8] px-4 py-3 rounded-2xl'
+                      : ''
+                  }`}>
+                    <p className="text-[0.85rem] text-[#303030] whitespace-pre-wrap leading-relaxed">
+                      {msg.content}
+                    </p>
+                  </div>
                 </div>
               ))}
               
               {chatLoading && (
-                <div className="mr-12 bg-white border border-[#E0E0E0] p-4 rounded-lg">
-                  <p className="text-[0.85rem] text-[#707070]">Thinking...</p>
-                </div>
+                <div className="text-[0.85rem] text-[#909090]">Thinking...</div>
               )}
             </div>
 
             {/* Chat Input */}
-            <form onSubmit={handleChatSend} className="space-y-3">
+            <form onSubmit={handleChatSend} className="relative">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Ask a follow-up question..."
                 disabled={chatLoading}
-                className="w-full px-4 py-3 text-[0.9rem] border border-[#D0D0D0] rounded-lg focus:outline-none focus:border-[#D0D0D0] disabled:opacity-50"
+                className="w-full px-5 py-4 pr-20 text-[0.9rem] border border-[#E0E0E0] rounded-full focus:outline-none focus:border-[#B0B0B0] disabled:opacity-50 transition-colors"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim() || chatLoading}
-                className="w-full px-4 py-2.5 text-[0.9rem] bg-[#2563eb] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 text-[0.85rem] text-[#606060] hover:text-[#202020] transition-colors disabled:opacity-30"
               >
                 Send
               </button>

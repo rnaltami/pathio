@@ -556,3 +556,106 @@ def better_candidate(req: BetterCandidateRequest):
     if not actions:
         return {"llm_ok": False, "actions": []}
     return {"llm_ok": True, "actions": actions}
+
+# =========================
+# Career Analytics Endpoint
+# =========================
+class AnalyticsRequest(BaseModel):
+    resume_text: str
+
+@router.post("/career-analytics")
+def career_analytics(req: AnalyticsRequest):
+    """
+    Analyze a resume and return YouTube-style career analytics using AI
+    """
+    resume_text = req.resume_text or ""
+    if not resume_text.strip():
+        raise HTTPException(status_code=400, detail="Resume text is required")
+    
+    if not _client:
+        raise HTTPException(status_code=500, detail="OpenAI client not available")
+    
+    try:
+        # AI prompt to generate personalized analytics
+        prompt = f"""You are a career analytics engine designed for Gen Z and Gen Alpha job seekers. Analyze this resume and provide insights like YouTube Studio provides to creators.
+
+Resume:
+{resume_text}
+
+Return a JSON object with the following structure (be adaptive to whatever field/industry this resume represents):
+
+{{
+  "creative_focus": {{"Industry 1": percentage, "Industry 2": percentage, ...}},
+  "core_strength_zones": ["Strength 1", "Strength 2", ...],
+  "experience_depth_years": estimated_years_of_experience,
+  "skill_stack_health": {{"Core": percentage, "Growth": percentage, "Emerging": percentage}},
+  "momentum_indicators": ["Momentum signal 1", "Momentum signal 2", ...],
+  "recommended_focus_next": ["Action 1", "Action 2", "Action 3"],
+  "adjacent_opportunities": [
+    {{"skill_combo": "Skill A + Skill B", "opportunity": "Role/field they could pivot to"}},
+    {{"skill_combo": "Skill C + Skill D", "opportunity": "Another adjacent role/field"}}
+  ],
+  "potential_new_skills": ["Skill suggestion 1", "Skill suggestion 2", ...],
+  "ai_skills_to_explore": ["AI skill 1", "AI skill 2", ...],
+  "extracted_skills": ["Skill 1", "Skill 2", ...]
+}}
+
+Guidelines:
+- **creative_focus**: Identify 2-4 industries/fields they work in with percentage breakdown (must sum to 100)
+- **core_strength_zones**: List 3-5 core competencies based on their experience
+- **experience_depth_years**: Estimate total years of professional experience (integer)
+- **skill_stack_health**: Categorize their skills into Core (fundamental to their field), Growth (advancing skills), and Emerging (new/learning) with percentages (must sum to 100)
+- **momentum_indicators**: 2-4 positive growth signals or trends in their career
+- **recommended_focus_next**: 3-4 actionable next steps to advance their career
+- **adjacent_opportunities**: 3-5 strategic, future-proof career pivots based on their top skill combinations. This is NOT about "changing majors" or random job suggestions—it's about identifying SMART pivots that leverage their existing skills in ways that are tech-resilient and high-value. Show them "What ELSE can I do that positions me well for the future?" Focus on:
+  - Roles that emphasize HUMAN skills (creativity, judgment, relationships, strategy, taste, empathy) that technology can't easily replicate
+  - Fields where their expertise becomes MORE valuable as tech evolves (e.g., someone needs to guide, curate, validate, design for humans)
+  - Opportunities that are growing, not shrinking—but don't make everything about "AI" or "tech"
+  Format: {{"skill_combo": "Skill X + Skill Y", "opportunity": "Specific role or field (brief why it's future-proof)"}}. Examples:
+  - Writer: {{"skill_combo": "Storytelling + Research", "opportunity": "Brand Strategist (companies need authentic narratives, not just content)"}}
+  - Barista: {{"skill_combo": "Customer Service + Multitasking", "opportunity": "Client Success Manager (relationships and judgment can't be automated)"}}
+  - Nurse: {{"skill_combo": "Patient Care + Critical Thinking", "opportunity": "Care Coordinator or Patient Advocate (empathy and complex decision-making)"}}
+  - Developer: {{"skill_combo": "Problem Solving + Communication", "opportunity": "Solutions Architect or Technical Consultant (bridging human needs and tech)"}}
+  - Teacher: {{"skill_combo": "Mentorship + Curriculum Design", "opportunity": "Learning Experience Designer (personalized education needs human insight)"}}
+  Be specific, strategic, and empowering. Frame pivots as SMART career moves that leverage their HUMAN strengths in a tech-evolving world. Don't make every suggestion AI-related—focus on roles where human judgment, creativity, relationships, and taste are the core value.
+- **potential_new_skills**: 4-6 relevant skills they should learn based on their field (non-AI)
+- **ai_skills_to_explore**: 4-6 cutting-edge, LATEST AI tools/skills that would benefit their specific career path. Be specific about HOW they'd use it in their actual work. Focus on tools that are actively trending and widely adopted RIGHT NOW. Examples by field:
+  - Creative: "Claude/ChatGPT for scriptwriting", "Runway for video generation", "ElevenLabs for voice", "Midjourney/DALL-E for visuals"
+  - Tech: "Cursor/GitHub Copilot for coding", "v0/Bolt for rapid prototyping", "AI code review tools"
+  - Business: "Perplexity for deep research", "Notion AI for docs", "ChatGPT for strategy/analysis"
+  - Healthcare: "AI medical scribing", "Diagnostic support AI"
+  - Retail/Service: "AI customer service bots", "Predictive inventory AI"
+  - Design: "Figma AI", "Framer AI", "Relume for web design"
+  Only suggest tools that are CURRENTLY available and being used by professionals. Be practical and actionable. Avoid anything outdated or deprecated.
+- **extracted_skills**: List 8-12 specific skills mentioned in their resume
+
+Be encouraging, specific, and adaptive to ANY career field (tech, retail, healthcare, creative, trades, etc.).
+Prioritize the MOST CURRENT and WIDELY-ADOPTED AI tools available right now.
+Return ONLY valid JSON, no markdown or extra text."""
+
+        # Call OpenAI
+        if _new_api:
+            response = _client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            analytics_json = response.choices[0].message.content.strip()
+        else:
+            response = _client.ChatCompletion.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            analytics_json = response['choices'][0]['message']['content'].strip()
+        
+        # Parse JSON response
+        # Remove markdown code blocks if present
+        analytics_json = analytics_json.replace("```json", "").replace("```", "").strip()
+        analytics = json.loads(analytics_json)
+        
+        return analytics
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")

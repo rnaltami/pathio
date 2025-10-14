@@ -87,54 +87,62 @@ ${jobData.requirements && jobData.requirements.length > 0 ? `\n\nRequirements:\n
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-[680px] mx-auto px-4 py-8">
+      <div className="max-w-[720px] mx-auto px-4 pt-20 pb-8">
         {/* Header */}
-        <header className="text-center mb-12">
+        <header className="text-center mb-18">
           <a href="/">
-            <h1 className="text-3xl font-normal text-[#303030] tracking-tight cursor-pointer hover:opacity-70 transition-opacity">
+            <h1 className="text-[2rem] font-light text-[#202020] tracking-tight cursor-pointer hover:opacity-60 transition-opacity">
               pathio
             </h1>
           </a>
         </header>
 
+        {/* Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="mb-8 text-[0.85rem] text-[#909090] hover:text-[#505050] transition-colors"
+        >
+          ← Back
+        </button>
+
         {/* Title */}
-        <div className="mb-8">
-          <h2 className="text-xl font-medium text-[#202020] mb-2">
-            Application Preparation
+        <div className="mb-10">
+          <h2 className="text-[1.5rem] font-normal text-[#202020] mb-3">
+            Get this job
           </h2>
           {job && (
-            <p className="text-[0.9rem] text-[#707070]">
-              Preparing for: <span className="text-[#2563eb]">{job.title}</span> at {job.company}
+            <p className="text-[0.9rem] text-[#606060]">
+              {job.title} at {job.company}
             </p>
           )}
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
           {/* Job Description Field */}
           <div>
-            <label className="block text-[0.95rem] font-medium text-[#202020] mb-2">
-              Job Description
+            <label className="block text-[0.9rem] text-[#505050] mb-3">
+              Job Details
             </label>
             <textarea
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job description here..."
-              className="w-full h-48 px-4 py-3 text-[0.9rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0] resize-y"
+              className="w-full h-48 px-4 py-3 text-[0.9rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#B0B0B0] resize-y transition-colors"
               required
             />
           </div>
 
           {/* Resume Field */}
           <div>
-            <label className="block text-[0.95rem] font-medium text-[#202020] mb-2">
-              Your Current Resume
+            <label className="block text-[0.9rem] text-[#505050] mb-3">
+              Your Resume
             </label>
             <textarea
               value={resume}
               onChange={(e) => setResume(e.target.value)}
-              placeholder="Paste your resume here..."
-              className="w-full h-64 px-4 py-3 text-[0.9rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0] resize-y"
+              placeholder="Paste your current resume here..."
+              className="w-full h-64 px-4 py-3 text-[0.9rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#B0B0B0] resize-y transition-colors"
               required
             />
           </div>
@@ -143,21 +151,10 @@ ${jobData.requirements && jobData.requirements.length > 0 ? `\n\nRequirements:\n
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-3 text-center text-[0.95rem] bg-[#2563eb] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full px-6 py-4 text-center text-[0.95rem] bg-[#202020] text-white rounded-full hover:opacity-80 transition-opacity disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Tailor Resume & Generate Cover Letter →'}
+            {loading ? 'Tailoring your application...' : 'Generate tailored resume & cover letter'}
           </button>
-
-          {/* Back Link */}
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="text-[0.9rem] text-[#707070] hover:opacity-70 transition-opacity"
-            >
-              ← Back to job search
-            </button>
-          </div>
         </form>
       </div>
     </main>
