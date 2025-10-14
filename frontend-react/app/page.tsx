@@ -66,18 +66,22 @@ export default function Home() {
   const [analyticsChatMessages, setAnalyticsChatMessages] = useState<Array<{role: string, content: string}>>([]);
   const [analyticsChatInput, setAnalyticsChatInput] = useState('');
   const [analyticsChatLoading, setAnalyticsChatLoading] = useState(false);
+  const [generalChatInput, setGeneralChatInput] = useState('');
+  const [generalChatLoading, setGeneralChatLoading] = useState(false);
   
-  // Action link flow state
-  const [activeActionFlow, setActiveActionFlow] = useState<'job-search' | 'land-job' | 'ai-tools' | null>(null);
+  // Unified landing page state
+  const [selectedAction, setSelectedAction] = useState<'chat' | 'career-analytics' | 'find-job' | 'land-job' | 'ai-tools' | null>('chat');
   const [actionFlowInput, setActionFlowInput] = useState('');
   const [actionFlowLoading, setActionFlowLoading] = useState(false);
   const [aiToolsMessages, setAiToolsMessages] = useState<Array<{role: string, content: string}>>([]);
+  const [activeActionFlow, setActiveActionFlow] = useState<string | null>(null);
   const [lastJobSearchQuery, setLastJobSearchQuery] = useState('');
   const [selectedJobForTailoring, setSelectedJobForTailoring] = useState<Job | null>(null);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const analyticsChatContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -104,16 +108,20 @@ export default function Home() {
   }, [analyticsChatMessages]);
 
   // Get search placeholder based on intent
-  const getSearchPlaceholder = () => {
-    switch (intent) {
+  const getUnifiedPlaceholder = () => {
+    switch (selectedAction) {
+      case 'chat':
+        return "Ask anything about your future";
+      case 'career-analytics':
+        return "Paste your resume here...";
       case 'find-job':
-        return 'remote producer roles in kids\' media...';
+        return "Find a job ie. writer, data scientist, etc....";
       case 'land-job':
-        return 'Paste the job listing here...';
+        return "Paste the job listing here";
       case 'ai-tools':
-        return 'AI tools to help me write my pitch deck...';
+        return "What do you want to build? (e.g., a pitch deck for my startup, a portfolio website)";
       default:
-        return 'What are you looking for?';
+        return "Ask anything about your future";
     }
   };
 
@@ -550,6 +558,181 @@ export default function Home() {
     }
   };
 
+  // Unified form handler for initial actions + chat
+  const handleUnifiedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const inputText = searchQuery.trim();
+    
+    if (!inputText) return;
+    
+    // If chat action selected, treat as general career coach chat
+    if (selectedAction === 'chat') {
+      setLoading(true);
+      try {
+        // Add user message to chat
+        const userMessage = { role: 'user', content: inputText };
+        setChatMessages(prev => [...prev, userMessage]);
+        
+        // Send to career coach
+        const response = await fetch(`${API_URL}/coach`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { 
+                role: 'system', 
+                content: `You are Pathio, a career coach for Gen Z/Alpha. Help users with career guidance, job search, resume advice, and future planning. Be encouraging, specific, and actionable.` 
+              },
+              ...chatMessages,
+              userMessage
+            ]
+          })
+        });
+        
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Add assistant response to chat
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply
+      }]);
+      
+      // Clear the input
+      setSearchQuery('');
+    } catch (error) {
+      console.error('Career coach error:', error);
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Sorry, an error occurred. Please try again.'
+        }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      if (selectedAction === 'career-analytics') {
+        // Handle career analytics
+        const response = await fetch(`${API_URL}/career-analytics`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume_text: inputText })
+        });
+        const data = await response.json();
+        setCareerAnalytics(data);
+        setResume(inputText);
+        // Enable chat for follow-up questions
+        setChatMessages([{ role: 'user', content: inputText }]);
+      } else if (selectedAction === 'find-job') {
+        // Handle job search
+        const response = await fetch(`${API_URL}/search-jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_title: inputText })
+        });
+        const data = await response.json();
+        setJobs(data.jobs || []);
+        setHasSearched(true);
+        setLastJobSearchQuery(inputText);
+        // Enable chat for follow-up questions
+        setChatMessages([{ role: 'user', content: inputText }]);
+      } else if (selectedAction === 'land-job') {
+        // Handle job landing - store job description and ask for resume
+        setJobs([{ description: inputText } as Job]);
+        setHasSearched(true);
+        setLastJobSearchQuery('Custom Job');
+        // Enable chat for follow-up questions
+        setChatMessages([{ role: 'user', content: inputText }]);
+      } else if (selectedAction === 'ai-tools') {
+        // Handle AI tools - start with career coach
+        const userMessage = { role: 'user', content: inputText };
+        setChatMessages([userMessage]);
+        
+        const response = await fetch(`${API_URL}/coach`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { 
+                role: 'system', 
+                content: `You are Pathio, a career coach for Gen Z/Alpha. Help users with AI tools for their career goals. Be encouraging, specific, and actionable.` 
+              },
+              userMessage
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.reply
+        }]);
+      }
+      
+      // Clear the input and reset action
+      setSearchQuery('');
+      setSelectedAction(null);
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle general career chat (from fixed chat input)
+  const handleGeneralChatSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!generalChatInput.trim() || generalChatLoading) return;
+
+    setGeneralChatLoading(true);
+    const userMessage = { role: 'user', content: generalChatInput.trim() };
+    
+    try {
+      // Add user message
+      setChatMessages(prev => [...prev, userMessage]);
+      setGeneralChatInput('');
+
+      // Send to career coach
+      const response = await fetch(`${API_URL}/coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { 
+              role: 'system', 
+              content: `You are Pathio, a career coach for Gen Z/Alpha. Help users with career guidance, job search, resume advice, and future planning. Be encouraging, specific, and actionable.` 
+            },
+            ...chatMessages,
+            userMessage
+          ]
+        })
+      });
+
+      const data = await response.json();
+
+      // Add assistant response
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply
+      }]);
+    } catch (error) {
+      console.error('General chat error:', error);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, an error occurred. Please try again.'
+      }]);
+    } finally {
+      setGeneralChatLoading(false);
+    }
+  };
+
   // Handle analytics chat
   const handleAnalyticsChatSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -646,8 +829,8 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             }}>
               pathio
             </span>
-            {!careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0) && (
-              <span className="text-[0.9rem] text-[#A78BFA]" style={{ fontWeight: '600' }}>
+            {!careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0) && chatMessages.length === 0 && (
+              <span className="text-[0.9rem]" style={{ fontWeight: '600', color: '#A78BFA' }}>
                 smart career moves
               </span>
             )}
@@ -655,7 +838,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
         </a>
       </div>
 
-      <div className="max-w-[720px] mx-auto px-4 w-full" style={{ paddingBottom: '32px', paddingTop: careerAnalytics || tailoredResults || (hasSearched && jobs.length > 0) ? '140px' : '0' }}>
+      <div className="max-w-[720px] mx-auto px-4 w-full" style={{ paddingBottom: '32px', paddingTop: careerAnalytics || tailoredResults || (hasSearched && jobs.length > 0) || chatMessages.length > 0 ? '140px' : '0' }}>
 
         {/* Show job results if available */}
         {hasSearched && jobs.length > 0 ? (
@@ -1371,69 +1554,55 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
               </div>
             )}
           </>
-        ) : !careerAnalytics ? (
+        ) : !careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0) && chatMessages.length === 0 ? (
           <>
         {/* Resume Upload Area */}
         <div className="mb-6">
           <div className="flex flex-col items-center gap-4">
             {/* Textarea with file upload option */}
             <div className="w-full" style={{ maxWidth: '680px' }}>
-              <textarea
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Start with your resume. We'll show your career analytics and future skills to level up."
-                className="w-full text-[1rem] border-2 border-[#D8B4FE] focus:outline-none focus:border-[#A78BFA] transition-colors resize-none font-medium"
-                rows={6}
-                style={{ borderRadius: '20px', padding: '18px 22px', background: '#FAFAF9' }}
-              />
-              <div className="flex justify-center items-center" style={{ marginTop: '8px', paddingLeft: '4px', paddingRight: '4px', gap: '12px' }}>
-                <input
-                  type="file"
-                  accept=".txt,.pdf,.doc,.docx"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const text = await file.text();
-                      setSearchQuery(text);
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                  id="resume-upload"
+              <form onSubmit={handleUnifiedSubmit}>
+                <textarea
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={getUnifiedPlaceholder()}
+                  className="w-full text-[1rem] border-2 border-[#D8B4FE] focus:outline-none focus:border-[#A78BFA] transition-colors resize-none font-medium"
+                  rows={6}
+                  style={{ borderRadius: '20px', padding: '18px 22px', background: '#FAFAF9' }}
                 />
-                <label
-                  htmlFor="resume-upload"
-                  className="text-[0.9rem] text-[#A78BFA] hover:opacity-80 cursor-pointer transition-opacity"
-                  style={{ textDecoration: 'none', fontWeight: '600' }}
-                >
-                  Upload file
-                </label>
+              <div className="flex justify-center items-center" style={{ marginTop: '8px', paddingLeft: '4px', paddingRight: '4px', gap: '12px' }}>
+                {(selectedAction === 'career-analytics' || selectedAction === 'land-job') && (
+                  <>
+                    <input
+                      type="file"
+                      accept=".txt,.pdf,.doc,.docx"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const text = await file.text();
+                          setSearchQuery(text);
+                        }
+                      }}
+                      style={{ display: 'none' }}
+                      id="resume-upload"
+                    />
+                    <label
+                      htmlFor="resume-upload"
+                      className="text-[0.9rem] hover:opacity-80 cursor-pointer transition-opacity"
+                      style={{ textDecoration: 'none', fontWeight: '600', color: '#5B21B6' }}
+                    >
+                      Upload file
+                    </label>
+                  </>
+                )}
                 <button
-                  onClick={async () => {
-                    if (!searchQuery.trim()) return;
-                    
-                    setLoading(true);
-                    try {
-                      const response = await fetch(`${API_URL}/career-analytics`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ resume_text: searchQuery })
-                      });
-                      const data = await response.json();
-                      setCareerAnalytics(data);
-                      setResume(searchQuery);
-                    } catch (error) {
-                      console.error('Analytics error:', error);
-                      alert('Error analyzing resume. Please try again.');
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
+                  type="submit"
                   disabled={loading || !searchQuery.trim()}
                   style={{ 
-                    background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%) !important',
+                    background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)',
                     padding: '12px 36px',
                     borderRadius: '24px',
-                    color: '#FFFFFF !important',
+                    color: '#FFFFFF',
                     fontWeight: 'bold',
                     border: 'none',
                     cursor: (loading || !searchQuery.trim()) ? 'not-allowed' : 'pointer',
@@ -1447,67 +1616,108 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                     display: 'inline-block',
                     transition: 'opacity 0.2s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = (loading || !searchQuery.trim()) ? '0.6' : '1'}
+                  onMouseEnter={(e) => {
+                    if (!loading && searchQuery.trim()) {
+                      e.currentTarget.style.opacity = '0.9';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = (loading || !searchQuery.trim()) ? '0.6' : '1';
+                  }}
                 >
-                  {loading ? 'Analyzing...' : 'Analyze'}
+                  {loading ? 'Thinking...' : '→'}
                 </button>
               </div>
+              </form>
             </div>
           </div>
         </div>
 
-        {/* Alternative Actions - Perplexity "Related" style */}
-        {!loading && !careerAnalytics && (
+        {/* Suggestion Chips - Perplexity style */}
+        {!loading && !careerAnalytics && chatMessages.length === 0 && (
           <div className="flex flex-col items-center" style={{ marginTop: '34px' }}>
-            <div className="text-[0.9rem]" style={{ fontWeight: '700', color: '#1F2937', marginBottom: '8px' }}>OR</div>
-            <button
-              onClick={() => setActiveActionFlow('job-search')}
-              className="text-[1rem] text-[#313338] hover:text-[#5865F2] transition-colors"
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer', 
-                textDecoration: 'none',
-                fontWeight: '500',
-                marginBottom: '8px'
-              }}
-            >
-              Find a job — the old-fashioned kind with paychecks.
-            </button>
-            <button
-              onClick={() => setActiveActionFlow('land-job')}
-              className="text-[1rem] text-[#313338] hover:text-[#5865F2] transition-colors"
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer', 
-                textDecoration: 'none',
-                fontWeight: '500',
-                marginBottom: '8px'
-              }}
-            >
-              Help me land a job — I already have a listing.
-            </button>
-            <button
-              onClick={() => setActiveActionFlow('ai-tools')}
-              className="text-[1rem] text-[#313338] hover:text-[#5865F2] transition-colors"
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer', 
-                textDecoration: 'none',
-                fontWeight: '500'
-              }}
-            >
-              Find AI tools — so I can build my own thing instead.
-            </button>
-          </div>
-        )}
-
-        {loading && (
-          <div className="text-center text-[0.9rem] text-[#505050]" style={{ marginTop: '24px' }}>
-            Analyzing your resume...
+            <div className="flex flex-wrap justify-center" style={{ maxWidth: '680px', gap: '8px' }}>
+              <button
+                onClick={() => setSelectedAction('chat')}
+                style={{ 
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  background: selectedAction === 'chat' ? '#7C3AED' : '#F3E8FF',
+                  color: selectedAction === 'chat' ? '#FFFFFF' : '#5B21B6',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Chat
+              </button>
+              <button
+                onClick={() => setSelectedAction('career-analytics')}
+                style={{ 
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  background: selectedAction === 'career-analytics' ? '#7C3AED' : '#F3E8FF',
+                  color: selectedAction === 'career-analytics' ? '#FFFFFF' : '#5B21B6',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Show me my career analytics
+              </button>
+              <button
+                onClick={() => setSelectedAction('find-job')}
+                style={{ 
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  background: selectedAction === 'find-job' ? '#7C3AED' : '#F3E8FF',
+                  color: selectedAction === 'find-job' ? '#FFFFFF' : '#5B21B6',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Help me find a job
+              </button>
+              <button
+                onClick={() => setSelectedAction('land-job')}
+                style={{ 
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  background: selectedAction === 'land-job' ? '#7C3AED' : '#F3E8FF',
+                  color: selectedAction === 'land-job' ? '#FFFFFF' : '#5B21B6',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                I have a job listing, help me land it
+              </button>
+              <button
+                onClick={() => setSelectedAction('ai-tools')}
+                style={{ 
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  background: selectedAction === 'ai-tools' ? '#7C3AED' : '#F3E8FF',
+                  color: selectedAction === 'ai-tools' ? '#FFFFFF' : '#5B21B6',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                I want to do my own thing, show me AI tools
+              </button>
+            </div>
           </div>
         )}
 
@@ -1784,6 +1994,64 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
         )}
         </>
         ) : null}
+
+        {/* General Chat Messages */}
+        {chatMessages.length > 0 && !careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0) && (
+          <div style={{ marginTop: '40px', marginBottom: '200px' }}>
+            <h2 className="text-[1.6rem] text-center" style={{ 
+              fontWeight: '800',
+              color: '#0A0A0A',
+              marginBottom: '32px'
+            }}>
+              Career Chat
+            </h2>
+            
+            {chatMessages.length > 0 ? (
+              <div className="space-y-6">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} style={{ animation: 'slideUp 0.4s ease-out' }}>
+                    <div style={{
+                      background: msg.role === 'user' 
+                        ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' 
+                        : 'linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%)',
+                      borderRadius: '20px',
+                      padding: '20px 24px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #E5E7EB'
+                    }}>
+                      <div style={{
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        color: msg.role === 'user' ? '#FFFFFF' : '#6B7280',
+                        marginBottom: '8px'
+                      }}>
+                        {msg.role === 'user' ? 'You' : 'Pathio'}
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        lineHeight: '1.6',
+                        color: msg.role === 'user' ? '#FFFFFF' : '#0A0A0A',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {loading && (
+                  <div className="text-center text-[0.9rem] text-[#505050]" style={{ marginTop: '24px' }}>
+                    Thinking...
+                  </div>
+                )}
+              </div>
+            ) : loading ? (
+              <div className="text-center text-[0.9rem] text-[#505050]">
+                Thinking...
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {/* Fixed Bottom Chat Panel - For analytics */}
@@ -1801,7 +2069,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             padding: '20px 0'
           }}
         >
-          <div className="max-w-[720px] mx-auto px-4">
+          <div className="mx-auto px-4" style={{ maxWidth: '680px' }}>
             <form onSubmit={handleAnalyticsChatSend}>
               <textarea
                 value={analyticsChatInput}
@@ -1841,7 +2109,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                     opacity: analyticsChatLoading ? 0.6 : 1
                   }}
                 >
-                  {analyticsChatLoading ? 'Thinking...' : 'Ask'}
+                  {analyticsChatLoading ? 'Thinking...' : '→'}
                 </button>
               </div>
             </form>
@@ -1864,7 +2132,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             padding: '20px 0'
           }}
         >
-          <div className="max-w-[720px] mx-auto px-4">
+          <div className="mx-auto px-4" style={{ maxWidth: '680px' }}>
             <form onSubmit={handleChatSend}>
               <textarea
                 value={chatInput}
@@ -1910,10 +2178,94 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                     opacity: chatLoading || !chatInput.trim() ? 0.6 : 1
                   }}
                 >
-                  {chatLoading ? 'Thinking...' : 'Ask'}
+                  {chatLoading ? 'Thinking...' : '→'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Fixed Bottom Chat Panel - For general career chat */}
+      {chatMessages.length > 0 && !careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0) && (
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: '#FFFFFF',
+            borderTop: '1px solid #E5E5E5',
+            boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
+            zIndex: 9999,
+            padding: '20px 0'
+          }}
+        >
+          <div className="max-w-[720px] mx-auto w-full" style={{ paddingLeft: '13px', paddingRight: '59px' }}>
+            <div className="mb-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-full" style={{ maxWidth: '680px' }}>
+                  <form onSubmit={handleGeneralChatSend}>
+                    <textarea
+                      value={generalChatInput}
+                      onChange={(e) => setGeneralChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleGeneralChatSend(e as any);
+                        }
+                      }}
+                      placeholder="Follow up..."
+                      className="w-full text-[1rem] border-2 border-[#D8B4FE] focus:outline-none focus:border-[#A78BFA] transition-colors resize-none font-medium"
+                      disabled={generalChatLoading}
+                      rows={2}
+                      style={{ 
+                        background: '#FAFAF9',
+                        borderRadius: '20px',
+                        padding: '18px 22px',
+                        minHeight: '60px',
+                        outline: 'none',
+                        opacity: generalChatLoading ? 0.6 : 1
+                      }}
+                    />
+                    <div className="flex justify-center items-center" style={{ marginTop: '8px', paddingLeft: '4px', paddingRight: '4px', gap: '12px' }}>
+                      <button
+                        type="submit"
+                        disabled={generalChatLoading || !generalChatInput.trim()}
+                        style={{ 
+                          background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)',
+                          padding: '12px 36px',
+                          borderRadius: '24px',
+                          color: '#FFFFFF',
+                          fontWeight: 'bold',
+                          border: 'none',
+                          cursor: generalChatLoading || !generalChatInput.trim() ? 'not-allowed' : 'pointer',
+                          boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                          opacity: generalChatLoading || !generalChatInput.trim() ? 0.6 : 1,
+                          fontSize: '0.85rem',
+                          fontFamily: 'inherit',
+                          lineHeight: '1',
+                          textAlign: 'center',
+                          textDecoration: 'none',
+                          display: 'inline-block',
+                          transition: 'opacity 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!generalChatLoading && generalChatInput.trim()) {
+                            e.currentTarget.style.opacity = '0.9';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = (generalChatLoading || !generalChatInput.trim()) ? '0.6' : '1';
+                        }}
+                      >
+                        {generalChatLoading ? 'Thinking...' : '→'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2071,7 +2423,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                       opacity: actionFlowLoading ? 0.6 : 1
                     }}
                   >
-                    {actionFlowLoading ? 'Searching...' : 'Search'}
+                    {actionFlowLoading ? 'Searching...' : '→'}
                   </button>
                 </div>
               </form>
@@ -2145,7 +2497,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                       opacity: actionFlowLoading ? 0.6 : 1
                     }}
                   >
-                    {actionFlowLoading ? 'Processing...' : 'Next'}
+                    {actionFlowLoading ? 'Processing...' : '→'}
                   </button>
                 </div>
               </form>
