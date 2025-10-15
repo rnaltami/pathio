@@ -1,79 +1,75 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '../../config';
 
-interface Message {
+interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-function ChatContent() {
+export default function ChatPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const task = searchParams.get('task');
+  const initialQuery = searchParams.get('q') || '';
   
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If there's a specific task, start the conversation
-    if (task) {
-      setMessages([
-        {
-          role: 'assistant',
-          content: `I'll help you with this task: "${task}"\n\nLet me break down how to approach this step-by-step. What specific aspect would you like guidance on first?`
-        }
-      ]);
-    } else {
-      // General career guidance
-      setMessages([
-        {
-          role: 'assistant',
-          content: `Hi! I'm your career coach. I can help you with:\n\n• Job search strategies\n• Resume and cover letter tips\n• Interview preparation\n• Career transitions\n• Skill development\n\nWhat would you like to work on today?`
-        }
-      ]);
+    if (initialQuery) {
+      handleInitialQuery();
     }
-  }, [task]);
+  }, [initialQuery]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const userMessage = input.trim();
-    setInput('');
+  const handleInitialQuery = async () => {
+    if (!initialQuery.trim()) return;
     
-    // Add user message
-    const newMessages = [...messages, { role: 'user' as const, content: userMessage }];
-    setMessages(newMessages);
+    setLoading(true);
+    setChatMessages([{ role: 'user', content: initialQuery }]);
+    
+    try {
+      const response = await fetch(`${API_URL}/coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: initialQuery
+        })
+      });
+      const data = await response.json();
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch (error) {
+      console.error('Error:', error);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+
+    const userMessage = { role: 'user' as const, content: inputText };
+    setChatMessages(prev => [...prev, userMessage]);
+    setInputText('');
     setLoading(true);
 
     try {
       const response = await fetch(`${API_URL}/coach`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
+          question: inputText
+        })
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
       const data = await response.json();
-      
-      // Add assistant response
-      setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (error) {
       console.error('Error:', error);
-      setMessages([...newMessages, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
-      }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setLoading(false);
     }
@@ -81,96 +77,120 @@ function ChatContent() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-[680px] mx-auto px-4 py-8">
-        {/* Header */}
-        <header className="text-center mb-8">
-          <a href="/">
-            <h1 className="text-3xl font-normal text-[#303030] tracking-tight cursor-pointer hover:opacity-70 transition-opacity">
-              pathio
-            </h1>
-          </a>
-        </header>
-
-        {/* Title */}
-        <div className="mb-6">
-          <h2 className="text-xl font-medium text-[#202020] mb-2">
-            {task ? 'Task Guidance' : 'Career Coach'}
-          </h2>
-          <p className="text-[0.9rem] text-[#707070]">
-            {task ? 'Get step-by-step help completing this task' : 'Ask me anything about your career'}
-          </p>
-        </div>
-
-        {/* Messages */}
-        <div className="mb-6 space-y-4">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`${
-                msg.role === 'user'
-                  ? 'ml-12 bg-[#F5F5F5]'
-                  : 'mr-12 bg-white border border-[#E0E0E0]'
-              } p-4 rounded-lg`}
+      {/* Header */}
+      <div style={{ position: 'fixed', top: '40px', left: '40px', zIndex: 100 }}>
+        <a href="/" style={{ textDecoration: 'none' }}>
+          <div className="flex flex-col">
+            <span 
+              className="text-[1.6rem] cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ fontWeight: '800', color: '#0A0A0A', letterSpacing: '-0.3px', marginBottom: '4px' }}
             >
-              <p className="text-[0.85rem] text-[#303030] whitespace-pre-wrap leading-relaxed">
-                {msg.content}
-              </p>
+              pathio
+            </span>
+            <span 
+              className="text-[0.9rem]"
+              style={{ fontWeight: '600', color: '#A78BFA' }}
+            >
+              smart career moves
+            </span>
+          </div>
+        </a>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-[720px] mx-auto px-4 w-full" style={{ paddingBottom: '32px', paddingTop: '140px' }}>
+        
+        <h1 className="text-[1.6rem] text-center mb-6" style={{ fontWeight: '800', color: '#0A0A0A' }}>
+          Career Chat
+        </h1>
+
+        {/* Chat Messages */}
+        <div className="space-y-6 mb-8">
+          {chatMessages.map((message, index) => (
+            <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div 
+                className={`max-w-[80%] p-4 rounded-lg ${
+                  message.role === 'user' 
+                    ? 'bg-[#7C3AED] text-white' 
+                    : 'bg-[#F8FAFC] border border-[#E5E5E5] text-[#374151]'
+                }`}
+              >
+                <div 
+                  className="text-[0.9rem] leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: message.content.replace(/\n/g, '<br>') }}
+                />
+              </div>
             </div>
           ))}
           
           {loading && (
-            <div className="mr-12 bg-white border border-[#E0E0E0] p-4 rounded-lg">
-              <p className="text-[0.85rem] text-[#707070]">Thinking...</p>
+            <div className="flex justify-start">
+              <div className="bg-[#F8FAFC] border border-[#E5E5E5] p-4 rounded-lg">
+                <div className="text-[0.9rem] text-[#707070]">
+                  Thinking...
+                </div>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Input Form */}
-        <form onSubmit={handleSend} className="sticky bottom-8">
-          <div className="relative">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything..."
-              className="w-full px-4 py-3 text-[0.9rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0] pr-20"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 text-[0.85rem] bg-[#2563eb] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              Send
-            </button>
+        {/* Fixed Bottom Chat Input */}
+        <div style={{ position: 'fixed', bottom: '0', left: '0', right: '0', background: '#FFFFFF', borderTop: '1px solid #E5E5E5', boxShadow: '0 -4px 20px rgba(0,0,0,0.08)', zIndex: 9999, padding: '20px 0' }}>
+          <div className="max-w-[720px] mx-auto px-4 w-full">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full" style={{ maxWidth: '680px' }}>
+                <form onSubmit={handleSubmit}>
+                  <div style={{ marginTop: '8px', paddingLeft: '4px', paddingRight: '4px', gap: '12px' }} className="flex justify-center items-center">
+                    <button
+                      type="submit"
+                      disabled={loading || !inputText.trim()}
+                      className="text-[0.85rem] hover:opacity-90 transition-opacity"
+                      style={{
+                        background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)',
+                        padding: '12px 36px',
+                        borderRadius: '24px',
+                        color: '#FFFFFF',
+                        fontWeight: 'bold',
+                        border: 'none',
+                        cursor: loading || !inputText.trim() ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                        opacity: loading || !inputText.trim() ? 0.6 : 1,
+                        fontSize: '0.85rem',
+                        fontFamily: 'inherit',
+                        lineHeight: '1',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        display: 'inline-block',
+                        transition: 'opacity 0.2s'
+                      }}
+                    >
+                      →
+                    </button>
+                  </div>
+                  <textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="Follow up..."
+                    className="w-full text-[0.9rem] resize-none"
+                    style={{
+                      background: '#FAFAF9',
+                      padding: '18px 22px',
+                      border: '2px solid #D8B4FE',
+                      borderRadius: '20px',
+                      fontWeight: '500',
+                      minHeight: '60px',
+                      outline: 'currentcolor',
+                      transition: 'border-color 0.2s',
+                      opacity: 1
+                    }}
+                    rows={2}
+                  />
+                </form>
+              </div>
+            </div>
           </div>
-        </form>
-
-        {/* Back link */}
-        {task && (
-          <div className="mt-6 text-center">
-            <a
-              href="/results"
-              className="text-[0.85rem] text-[#707070] hover:opacity-70 transition-opacity"
-            >
-              ← Back to results
-            </a>
-          </div>
-        )}
+        </div>
       </div>
     </main>
   );
 }
-
-export default function ChatPage() {
-  return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-[0.9rem] text-[#707070]">Loading...</div>
-      </main>
-    }>
-      <ChatContent />
-    </Suspense>
-  );
-}
-
