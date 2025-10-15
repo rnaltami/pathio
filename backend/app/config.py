@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings  # <-- v2 import
 
 class Settings(BaseSettings):
     openai_api_key: str | None = None
+    adzuna_api_key: str | None = None
     allow_origins: str = "http://localhost:8501"
 
     # pydantic v2 config style

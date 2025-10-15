@@ -14,6 +14,10 @@ interface Job {
   match_score: number;
   source: string;
   url: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_is_predicted?: boolean;
+  job_type?: string; // remote, hybrid, onsite
 }
 
 interface TailoredResults {
@@ -44,9 +48,12 @@ export default function Home() {
   
   // Job search state
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [filter, setFilter] = useState<'all' | 'remote' | 'fulltime' | 'contract'>('all');
+  const [filter, setFilter] = useState<'all' | 'remote' | 'hybrid' | 'onsite'>('remote');
   const [locationFilter, setLocationFilter] = useState('');
+  const [employmentType, setEmploymentType] = useState<string | null>(null);
+  const [experienceLevel, setExperienceLevel] = useState<string | null>(null);
   const [expandedJobIndex, setExpandedJobIndex] = useState<number | null>(null);
+  const [comprehensiveJobResponse, setComprehensiveJobResponse] = useState('');
   
   // Tailoring flow state
   const [jobDescription, setJobDescription] = useState('');
@@ -115,7 +122,7 @@ export default function Home() {
       case 'career-analytics':
         return "Paste your resume here...";
       case 'find-job':
-        return "Find a job ie. writer, data scientist, etc....";
+        return "What job are you looking for? (e.g., writer, data scientist)";
       case 'land-job':
         return "Paste the job listing here";
       case 'ai-tools':
@@ -380,6 +387,7 @@ export default function Home() {
       
       setJobs(data.jobs || []);
       setHasSearched(true);
+      setComprehensiveJobResponse(data.comprehensive_response || '');
       setLastJobSearchQuery(jobQuery); // Store the search query
       // DON'T set searchQuery - that's for resume upload only
       setActiveActionFlow(null); // Close the panel
@@ -629,19 +637,22 @@ export default function Home() {
         setResume(inputText);
         // Enable chat for follow-up questions
         setChatMessages([{ role: 'user', content: inputText }]);
-      } else if (selectedAction === 'find-job') {
-        // Handle job search
-        const response = await fetch(`${API_URL}/search-jobs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_title: inputText })
-        });
-        const data = await response.json();
-        setJobs(data.jobs || []);
-        setHasSearched(true);
-        setLastJobSearchQuery(inputText);
-        // Enable chat for follow-up questions
-        setChatMessages([{ role: 'user', content: inputText }]);
+              } else if (selectedAction === 'find-job') {
+                // Handle job search
+                const response = await fetch(`${API_URL}/search-jobs`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    job_title: inputText,
+                    filter_type: 'remote'  // Default to remote for initial search
+                  })
+                });
+                const data = await response.json();
+                setJobs(data.jobs || []);
+                setHasSearched(true);
+                setLastJobSearchQuery(inputText);
+                // Enable chat for follow-up questions
+                setChatMessages([{ role: 'user', content: inputText }]);
       } else if (selectedAction === 'land-job') {
         // Handle job landing - store job description and ask for resume
         setJobs([{ description: inputText } as Job]);
@@ -846,10 +857,99 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             <h2 className="text-[1.6rem] text-center" style={{ 
               fontWeight: '800',
               color: '#0A0A0A',
-              marginBottom: '16px'
+              marginBottom: '24px'
             }}>
               Job Results
             </h2>
+            
+            {/* Search Bar */}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              try {
+                const response = await fetch(`${API_URL}/search-jobs`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    job_title: lastJobSearchQuery,
+                    location: locationFilter || undefined,
+                    filter_type: filter,
+                    employment_types: employmentType,
+                    job_requirements: experienceLevel
+                  })
+                });
+                const data = await response.json();
+                setJobs(data.jobs || []);
+              } catch (error) {
+                console.error('Error:', error);
+              } finally {
+                setLoading(false);
+              }
+            }}>
+              <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={lastJobSearchQuery}
+                  onChange={(e) => setLastJobSearchQuery(e.target.value)}
+                  placeholder="Job title (e.g., writer, data scientist)"
+                  style={{
+                    flex: '1',
+                    minWidth: '200px',
+                    maxWidth: '300px',
+                    padding: '12px 18px',
+                    fontSize: '0.9rem',
+                    border: '2px solid #D8B4FE',
+                    borderRadius: '20px',
+                    outline: 'none',
+                    background: '#FAFAF9',
+                    color: '#313338',
+                    fontWeight: '500'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#A78BFA'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#D8B4FE'}
+                />
+                <input
+                  type="text"
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  placeholder="Location (e.g., New York, Remote)"
+                  style={{
+                    flex: '1',
+                    minWidth: '200px',
+                    maxWidth: '300px',
+                    padding: '12px 18px',
+                    fontSize: '0.9rem',
+                    border: '2px solid #D8B4FE',
+                    borderRadius: '20px',
+                    outline: 'none',
+                    background: '#FAFAF9',
+                    color: '#313338',
+                    fontWeight: '500'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#A78BFA'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#D8B4FE'}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)',
+                    padding: '12px 32px',
+                    borderRadius: '20px',
+                    color: '#FFFFFF',
+                    fontWeight: '700',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                    transition: 'opacity 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                >
+                  Search
+                </button>
+              </div>
+            </form>
             
             {/* Job Count */}
             <div style={{ 
@@ -857,16 +957,43 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
               fontWeight: '500',
               color: '#707070',
               textAlign: 'center',
-              marginBottom: '32px'
+              marginBottom: '24px'
             }}>
-              {jobs.length} {lastJobSearchQuery} jobs found
+              {jobs.length > 0 ? `${jobs.length} jobs found` : 
+               (filter === 'hybrid' || filter === 'onsite') && !locationFilter ? 
+               `Please enter a location for ${filter} jobs` : 
+               'No jobs found'}
             </div>
 
             {/* Filter Options */}
             <div style={{ marginBottom: '32px' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
                 <button
-                  onClick={() => { setFilter('all'); setLocationFilter(''); }}
+                  onClick={async () => { 
+                    setFilter('all'); 
+                    setLocationFilter(''); 
+                    // Trigger new search with 'all' filter
+                    setLoading(true);
+                    try {
+                      const response = await fetch(`${API_URL}/search-jobs`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          job_title: lastJobSearchQuery,
+                          location: undefined, // No location for 'all' without location = remote
+                          filter_type: 'all',
+                          employment_types: employmentType,
+                          job_requirements: experienceLevel
+                        })
+                      });
+                      const data = await response.json();
+                      setJobs(data.jobs || []);
+                    } catch (error) {
+                      console.error('Error:', error);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
                   style={{
                     fontSize: '0.85rem',
                     fontWeight: '600',
@@ -882,7 +1009,31 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                   All
                 </button>
                 <button
-                  onClick={() => { setFilter('remote'); setLocationFilter(''); }}
+                  onClick={async () => { 
+                    setFilter('remote'); 
+                    setLocationFilter(''); 
+                    // Trigger new search with 'remote' filter
+                    setLoading(true);
+                    try {
+                      const response = await fetch(`${API_URL}/search-jobs`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          job_title: lastJobSearchQuery,
+                          location: undefined,
+                          filter_type: 'remote',
+                          employment_types: employmentType,
+                          job_requirements: experienceLevel
+                        })
+                      });
+                      const data = await response.json();
+                      setJobs(data.jobs || []);
+                    } catch (error) {
+                      console.error('Error:', error);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
                   style={{
                     fontSize: '0.85rem',
                     fontWeight: '600',
@@ -898,36 +1049,42 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                   Remote
                 </button>
                 <button
-                  onClick={() => { setFilter('fulltime'); setLocationFilter(''); }}
+                  onClick={() => { 
+                    setFilter('hybrid'); 
+                    setLocationFilter(''); 
+                  }}
                   style={{
                     fontSize: '0.85rem',
                     fontWeight: '600',
                     padding: '10px 20px',
                     borderRadius: '20px',
-                    background: filter === 'fulltime' ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' : '#FAFAF9',
-                    color: filter === 'fulltime' ? '#FFFFFF' : '#313338',
-                    border: `2px solid ${filter === 'fulltime' ? '#7C3AED' : '#D8B4FE'}`,
+                    background: filter === 'hybrid' ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' : '#FAFAF9',
+                    color: filter === 'hybrid' ? '#FFFFFF' : '#313338',
+                    border: `2px solid ${filter === 'hybrid' ? '#7C3AED' : '#D8B4FE'}`,
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
                 >
-                  Full-time
+                  Hybrid
                 </button>
                 <button
-                  onClick={() => { setFilter('contract'); setLocationFilter(''); }}
+                  onClick={() => { 
+                    setFilter('onsite'); 
+                    setLocationFilter(''); 
+                  }}
                   style={{
                     fontSize: '0.85rem',
                     fontWeight: '600',
                     padding: '10px 20px',
                     borderRadius: '20px',
-                    background: filter === 'contract' ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' : '#FAFAF9',
-                    color: filter === 'contract' ? '#FFFFFF' : '#313338',
-                    border: `2px solid ${filter === 'contract' ? '#7C3AED' : '#D8B4FE'}`,
+                    background: filter === 'onsite' ? 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%)' : '#FAFAF9',
+                    color: filter === 'onsite' ? '#FFFFFF' : '#313338',
+                    border: `2px solid ${filter === 'onsite' ? '#7C3AED' : '#D8B4FE'}`,
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
                 >
-                  Contract
+                  Onsite
                 </button>
               </div>
             </div>
@@ -936,20 +1093,22 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             <div className="space-y-4">
               {jobs
                 .filter(job => {
-                  if (filter === 'remote') {
+                  // Use backend-provided job_type if available, otherwise fall back to description parsing
+                  const jobType = job.job_type || (() => {
                     const searchText = `${job.title} ${job.location} ${job.type} ${job.description}`.toLowerCase();
-                    return searchText.includes('remote');
+                    if (searchText.includes('remote')) return 'remote';
+                    if (searchText.includes('hybrid') || searchText.includes('flexible') || searchText.includes('partial remote')) return 'hybrid';
+                    return 'onsite';
+                  })();
+                  
+                  if (filter === 'remote') {
+                    return jobType === 'remote';
                   }
-                  if (filter === 'fulltime') {
-                    const searchText = `${job.type} ${job.title}`.toLowerCase();
-                    return searchText.includes('full') || searchText.includes('full-time');
+                  if (filter === 'hybrid') {
+                    return jobType === 'hybrid';
                   }
-                  if (filter === 'contract') {
-                    const searchText = `${job.type} ${job.title}`.toLowerCase();
-                    return searchText.includes('contract') || searchText.includes('contractor');
-                  }
-                  if (locationFilter) {
-                    return job.location.toLowerCase().includes(locationFilter.toLowerCase());
+                  if (filter === 'onsite') {
+                    return jobType === 'onsite';
                   }
                   return true;
                 })
@@ -983,6 +1142,12 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                         marginBottom: '4px'
                       }}>
                         {job.company} • {job.location} • {job.type}
+                        {job.salary_min && job.salary_max && (
+                          <span style={{ color: '#7C3AED', fontWeight: '600' }}>
+                            {' • $' + job.salary_min.toLocaleString() + ' - $' + job.salary_max.toLocaleString()}
+                            {job.salary_is_predicted && ' (est.)'}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1567,7 +1732,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={getUnifiedPlaceholder()}
                   className="w-full text-[1rem] border-2 border-[#D8B4FE] focus:outline-none focus:border-[#A78BFA] transition-colors resize-none font-medium"
-                  rows={6}
+                  rows={4}
                   style={{ borderRadius: '20px', padding: '18px 22px', background: '#FAFAF9' }}
                 />
               <div className="flex justify-center items-center" style={{ marginTop: '8px', paddingLeft: '4px', paddingRight: '4px', gap: '12px' }}>
@@ -1768,40 +1933,74 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                 </div>
               )}
             </div>
+
           </div>
         )}
 
         {/* Job Results - Show on same page */}
-        {hasSearched && intent === 'find-job' && jobs.length > 0 && (
+        {hasSearched && intent === 'find-job' && (
           <div className="mt-8">
             {loading && (
               <div className="text-[0.9rem] text-[#707070]">Searching...</div>
             )}
 
-            {!loading && jobs.length > 0 && (
+            {!loading && (
               <>
-                <div className="mb-4 text-[0.9rem] text-[#707070]">
-                  {(() => {
-                    const filtered = jobs.filter(job => {
-                      if (filter === 'remote') {
-                        const searchText = `${job.title} ${job.location} ${job.type} ${job.description}`.toLowerCase();
-                        return searchText.includes('remote');
-                      }
-                      if (filter === 'fulltime') {
-                        const searchText = `${job.type} ${job.title}`.toLowerCase();
-                        return searchText.includes('full') || searchText.includes('full-time');
-                      }
-                      if (filter === 'contract') {
-                        const searchText = `${job.type} ${job.title}`.toLowerCase();
-                        return searchText.includes('contract') || searchText.includes('contractor');
-                      }
-                      if (locationFilter) {
-                        return job.location.toLowerCase().includes(locationFilter.toLowerCase());
-                      }
-                      return true;
-                    });
-                    return `${filtered.length} ${searchQuery} jobs found`;
-                  })()}
+                <div className="mb-6 text-[0.9rem] text-[#707070] text-center">
+                  {jobs.length} jobs found
+                </div>
+
+                {/* SIMPLE FILTERS */}
+                <div className="mb-6 space-y-4">
+                  {/* Employment Type */}
+                  <div>
+                    <div className="text-[0.85rem] font-semibold text-[#313338] mb-2">Employment Type</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'FULLTIME', label: 'Full-time' },
+                        { key: 'CONTRACTOR', label: 'Contract' },
+                        { key: 'PARTTIME', label: 'Part-time' },
+                        { key: 'INTERN', label: 'Intern' }
+                      ].map((type) => (
+                        <button
+                          key={type.key}
+                          onClick={() => setEmploymentType(employmentType === type.key ? null : type.key)}
+                          className={`px-3 py-1 rounded-full text-[0.85rem] transition-all ${
+                            employmentType === type.key
+                              ? 'bg-[#7C3AED] text-white'
+                              : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
+                          }`}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Experience Level */}
+                  <div>
+                    <div className="text-[0.85rem] font-semibold text-[#313338] mb-2">Experience Level</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'no_experience', label: 'Entry Level' },
+                        { key: 'under_3_years_experience', label: 'Mid Level' },
+                        { key: 'more_than_3_years_experience', label: 'Senior Level' },
+                        { key: 'no_degree', label: 'No Degree Required' }
+                      ].map((level) => (
+                        <button
+                          key={level.key}
+                          onClick={() => setExperienceLevel(experienceLevel === level.key ? null : level.key)}
+                          className={`px-3 py-1 rounded-full text-[0.85rem] transition-all ${
+                            experienceLevel === level.key
+                              ? 'bg-[#7C3AED] text-white'
+                              : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
+                          }`}
+                        >
+                          {level.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Filter Options - Clean inline style */}
@@ -1827,53 +2026,185 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                     >
                       Remote
                     </button>
-                    <button
-                      onClick={() => { setFilter('fulltime'); setLocationFilter(''); }}
+                <button
+                  onClick={() => { 
+                    setFilter('hybrid'); 
+                    setLocationFilter(''); 
+                    // Don't auto-search - user needs to enter location first
+                  }}
                       className={`px-3 py-1 rounded-full transition-all ${
-                        filter === 'fulltime'
+                        filter === 'hybrid'
                           ? 'bg-[#202020] text-white'
                           : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
                       }`}
                     >
-                      Full-time
+                      Hybrid
                     </button>
-                    <button
-                      onClick={() => { setFilter('contract'); setLocationFilter(''); }}
+                <button
+                  onClick={() => { 
+                    setFilter('onsite'); 
+                    setLocationFilter(''); 
+                    // Don't auto-search - user needs to enter location first
+                  }}
                       className={`px-3 py-1 rounded-full transition-all ${
-                        filter === 'contract'
+                        filter === 'onsite'
                           ? 'bg-[#202020] text-white'
                           : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
                       }`}
                     >
-                      Contract
+                      Onsite
                     </button>
                   </div>
                   
-                  {/* Location filter */}
-                  <input
-                    type="text"
-                    value={locationFilter}
-                    onChange={(e) => { setLocationFilter(e.target.value); setFilter('all'); }}
-                    placeholder="Filter by location..."
-                    className="w-full px-3 py-2 text-[0.85rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0]"
-                  />
+                  {/* Location filter - show when Hybrid or Onsite is selected */}
+                  {(filter === 'hybrid' || filter === 'onsite') && (
+                    <input
+                      type="text"
+                      value={locationFilter}
+                      onChange={(e) => setLocationFilter(e.target.value)}
+                      placeholder="Enter city or state..."
+                      className="w-full px-3 py-2 text-[0.85rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#E0E0E0]"
+                    />
+                  )}
+                </div>
+
+                {/* Employment Type Filters */}
+                <div className="mb-4 pb-4 border-b border-[#E0E0E0]">
+                  <div style={{ 
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: '#313338',
+                    marginBottom: '8px'
+                  }}>
+                    Employment Type
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {['FULLTIME', 'CONTRACTOR', 'PARTTIME', 'INTERN'].map((type) => (
+                      <button
+                        key={type}
+                        onClick={async () => {
+                          // Toggle employment type filter
+                          const newEmploymentType = employmentType === type ? null : type;
+                          setEmploymentType(newEmploymentType);
+                          
+                          // Trigger new search with updated filter
+                          setLoading(true);
+                          try {
+                            const response = await fetch(`${API_URL}/search-jobs`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                job_title: lastJobSearchQuery,
+                                location: locationFilter || undefined,
+                                filter_type: filter,
+                                employment_types: newEmploymentType,
+                                job_requirements: experienceLevel
+                              })
+                            });
+                            const data = await response.json();
+                            setJobs(data.jobs || []);
+                          } catch (error) {
+                            console.error('Error:', error);
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full transition-all text-[0.85rem] ${
+                          employmentType === type
+                            ? 'bg-[#202020] text-white'
+                            : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
+                        }`}
+                      >
+                        {type === 'FULLTIME' ? 'Full-time' : 
+                         type === 'CONTRACTOR' ? 'Contract' : 
+                         type === 'PARTTIME' ? 'Part-time' : 'Intern'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Experience Level Filters */}
+                <div className="mb-4 pb-4 border-b border-[#E0E0E0]">
+                  <div style={{ 
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: '#313338',
+                    marginBottom: '8px'
+                  }}>
+                    Experience Level
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { api: 'no_experience', label: 'Entry Level' },
+                      { api: 'under_3_years_experience', label: 'Mid Level' },
+                      { api: 'more_than_3_years_experience', label: 'Senior Level' },
+                      { api: 'no_degree', label: 'No Degree Required' }
+                    ].map((level) => (
+                      <button
+                        key={level.api}
+                        onClick={async () => {
+                          // Toggle experience level filter
+                          const newExperienceLevel = experienceLevel === level.api ? null : level.api;
+                          setExperienceLevel(newExperienceLevel);
+                          
+                          // Trigger new search with updated filter
+                          setLoading(true);
+                          try {
+                            const response = await fetch(`${API_URL}/search-jobs`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                job_title: lastJobSearchQuery,
+                                location: locationFilter || undefined,
+                                filter_type: filter,
+                                employment_types: employmentType,
+                                job_requirements: newExperienceLevel
+                              })
+                            });
+                            const data = await response.json();
+                            setJobs(data.jobs || []);
+                          } catch (error) {
+                            console.error('Error:', error);
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full transition-all text-[0.85rem] ${
+                          experienceLevel === level.api
+                            ? 'bg-[#202020] text-white'
+                            : 'bg-[#F5F5F5] text-[#707070] hover:bg-[#E0E0E0]'
+                        }`}
+                      >
+                        {level.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Job listings - with filtering */}
                 <div>
                   {jobs
                     .filter(job => {
-                      if (filter === 'remote') {
+                      // Use backend-provided job_type if available, otherwise fall back to description parsing
+                      const jobType = job.job_type || (() => {
                         const searchText = `${job.title} ${job.location} ${job.type} ${job.description}`.toLowerCase();
-                        return searchText.includes('remote');
+                        if (searchText.includes('remote')) return 'remote';
+                        if (searchText.includes('hybrid') || searchText.includes('flexible') || searchText.includes('partial remote')) return 'hybrid';
+                        return 'onsite';
+                      })();
+                      
+                      if (filter === 'remote') {
+                        return jobType === 'remote';
                       }
-                      if (filter === 'fulltime') {
-                        const searchText = `${job.type} ${job.title}`.toLowerCase();
-                        return searchText.includes('full') || searchText.includes('full-time');
+                      if (filter === 'hybrid') {
+                        return jobType === 'hybrid';
                       }
-                      if (filter === 'contract') {
-                        const searchText = `${job.type} ${job.title}`.toLowerCase();
-                        return searchText.includes('contract') || searchText.includes('contractor');
+                      if (filter === 'onsite') {
+                        // If location filter is set, also filter by location
+                        if (locationFilter) {
+                          return jobType === 'onsite' && job.location.toLowerCase().includes(locationFilter.toLowerCase());
+                        }
+                        return jobType === 'onsite';
                       }
                       if (locationFilter) {
                         return job.location.toLowerCase().includes(locationFilter.toLowerCase());
@@ -1899,6 +2230,12 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                             {/* Company info - GREY AND LEFT ALIGNED */}
                             <div className="text-[0.85rem] text-[#707070] text-left">
                               {job.company} • {job.location} • {job.type}
+                              {job.salary_min && job.salary_max && (
+                                <span style={{ color: '#7C3AED', fontWeight: '600' }}>
+                                  {' • $' + job.salary_min.toLocaleString() + ' - $' + job.salary_max.toLocaleString()}
+                                  {job.salary_is_predicted && ' (est.)'}
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -1961,20 +2298,22 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
 
                 {/* No results message */}
                 {jobs.filter(job => {
-                  if (filter === 'remote') {
+                  // Use backend-provided job_type if available, otherwise fall back to description parsing
+                  const jobType = job.job_type || (() => {
                     const searchText = `${job.title} ${job.location} ${job.type} ${job.description}`.toLowerCase();
-                    return searchText.includes('remote');
+                    if (searchText.includes('remote')) return 'remote';
+                    if (searchText.includes('hybrid') || searchText.includes('flexible') || searchText.includes('partial remote')) return 'hybrid';
+                    return 'onsite';
+                  })();
+                  
+                  if (filter === 'remote') {
+                    return jobType === 'remote';
                   }
-                  if (filter === 'fulltime') {
-                    const searchText = `${job.type} ${job.title}`.toLowerCase();
-                    return searchText.includes('full') || searchText.includes('full-time');
+                  if (filter === 'hybrid') {
+                    return jobType === 'hybrid';
                   }
-                  if (filter === 'contract') {
-                    const searchText = `${job.type} ${job.title}`.toLowerCase();
-                    return searchText.includes('contract') || searchText.includes('contractor');
-                  }
-                  if (locationFilter) {
-                    return job.location.toLowerCase().includes(locationFilter.toLowerCase());
+                  if (filter === 'onsite') {
+                    return jobType === 'onsite';
                   }
                   return true;
                 }).length === 0 && (
@@ -2261,7 +2600,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                       >
                         {generalChatLoading ? 'Thinking...' : '→'}
                       </button>
-                    </div>
+    </div>
                   </form>
                 </div>
               </div>
@@ -2270,8 +2609,8 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
         </div>
       )}
 
-      {/* Fixed Bottom Chat Panel - For action flows and job search */}
-      {((activeActionFlow || aiToolsMessages.length > 0 || (hasSearched && jobs.length > 0) || selectedJobForTailoring) && !careerAnalytics && !tailoredResults) && (
+      {/* Fixed Bottom Chat Panel - For action flows (NOT for job search - job search uses search bar) */}
+      {((activeActionFlow || aiToolsMessages.length > 0 || selectedJobForTailoring) && !careerAnalytics && !tailoredResults && !(hasSearched && jobs.length > 0)) && (
         <div 
           style={{
             position: 'fixed',
@@ -2285,7 +2624,7 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
             padding: '20px 0'
           }}
         >
-          <div className="mx-auto px-4" style={{ maxWidth: '680px' }}>
+          <div className="mx-auto w-full" style={{ maxWidth: '680px', paddingLeft: '8px', paddingRight: '52px' }}>
             {selectedJobForTailoring && !activeActionFlow ? (
               <form onSubmit={handleTailorResumeSubmit}>
                 <textarea
@@ -2379,35 +2718,6 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                 />
                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', position: 'relative' }}>
                   <button
-                    type="button"
-                    onClick={() => setActiveActionFlow(null)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.2)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.1)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                    style={{ 
-                      position: 'absolute',
-                      left: '12px',
-                      background: 'rgba(124, 58, 237, 0.1)',
-                      padding: '8px 12px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      color: '#7C3AED',
-                      lineHeight: '1',
-                      borderRadius: '20px',
-                      fontWeight: 'bold',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.2)'
-                    }}
-                  >
-                    ×
-                  </button>
-                  <button
                     type="submit"
                     disabled={actionFlowLoading}
                     className="text-[0.85rem] hover:opacity-90 transition-opacity"
@@ -2453,35 +2763,6 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                 />
                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', position: 'relative' }}>
                   <button
-                    type="button"
-                    onClick={() => setActiveActionFlow(null)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.2)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.1)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                    style={{ 
-                      position: 'absolute',
-                      left: '12px',
-                      background: 'rgba(124, 58, 237, 0.1)',
-                      padding: '8px 12px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      color: '#7C3AED',
-                      lineHeight: '1',
-                      borderRadius: '20px',
-                      fontWeight: 'bold',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.2)'
-                    }}
-                  >
-                    ×
-                  </button>
-                  <button
                     type="submit"
                     disabled={actionFlowLoading}
                     className="text-[0.85rem] hover:opacity-90 transition-opacity"
@@ -2526,35 +2807,6 @@ Answer their questions about career paths, skills to learn, adjacent opportuniti
                   onBlur={(e) => e.target.style.borderColor = '#D8B4FE'}
                 />
                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveActionFlow(null)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.2)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(124, 58, 237, 0.1)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                    style={{ 
-                      position: 'absolute',
-                      left: '12px',
-                      background: 'rgba(124, 58, 237, 0.1)',
-                      padding: '8px 12px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      color: '#7C3AED',
-                      lineHeight: '1',
-                      borderRadius: '20px',
-                      fontWeight: 'bold',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.2)'
-                    }}
-                  >
-                    ×
-                  </button>
                   <button
                     type="submit"
                     disabled={actionFlowLoading}
