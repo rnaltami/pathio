@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const BACKEND_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://pathio-c9yz.onrender.com' 
-  : 'http://localhost:8000';
+const BACKEND_URL = 'https://pathio-c9yz.onrender.com';
 
 interface Job {
   title: string;
