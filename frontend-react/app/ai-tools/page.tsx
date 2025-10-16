@@ -12,6 +12,11 @@ export default function AIToolsPage() {
   const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (query) {
@@ -69,6 +74,16 @@ export default function AIToolsPage() {
     
     router.push(`/ai-tools?q=${encodeURIComponent(inputText)}`);
   };
+
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-[0.9rem] text-[#707070]">Loading...</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">

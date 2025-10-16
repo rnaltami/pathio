@@ -35,6 +35,11 @@ export default function JobSearchPage() {
   const [locationFilter, setLocationFilter] = useState('');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [lastApiResponse, setLastApiResponse] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (query && searchParams) {
@@ -100,6 +105,16 @@ export default function JobSearchPage() {
   const handleTailorResume = (job: Job) => {
     router.push(`/tailor?job=${encodeURIComponent(JSON.stringify(job))}`);
   };
+
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-[0.9rem] text-[#707070]">Loading...</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">

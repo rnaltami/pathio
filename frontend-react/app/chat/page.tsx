@@ -17,6 +17,11 @@ export default function ChatPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (initialQuery && searchParams) {
@@ -74,6 +79,16 @@ export default function ChatPage() {
       setLoading(false);
     }
   };
+
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-[0.9rem] text-[#707070]">Loading...</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">

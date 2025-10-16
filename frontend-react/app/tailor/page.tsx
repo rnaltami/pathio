@@ -30,9 +30,14 @@ export default function TailorPage() {
   const [resume, setResume] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (jobParam) {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (jobParam && searchParams) {
       try {
         const jobData = JSON.parse(decodeURIComponent(jobParam));
         setJob(jobData);
@@ -42,7 +47,7 @@ export default function TailorPage() {
         setJobListing(jobParam);
       }
     }
-  }, [jobParam]);
+  }, [jobParam, searchParams]);
 
   const handleTailor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +96,16 @@ export default function TailorPage() {
       console.error('Error downloading file:', error);
     }
   };
+
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-[0.9rem] text-[#707070]">Loading...</div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">
