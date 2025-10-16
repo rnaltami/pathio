@@ -24,7 +24,7 @@ interface Job {
 export default function JobSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const query = searchParams?.get('q') || '';
   
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,10 +37,10 @@ export default function JobSearchPage() {
   const [lastApiResponse, setLastApiResponse] = useState<any>(null);
 
   useEffect(() => {
-    if (query) {
+    if (query && searchParams) {
       searchJobs();
     }
-  }, [query]);
+  }, [query, searchParams]);
 
   const searchJobs = async () => {
     setLoading(true);
