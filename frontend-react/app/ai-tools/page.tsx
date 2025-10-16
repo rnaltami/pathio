@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '../../config';
+import dynamic from 'next/dynamic';
 
-export default function AIToolsPage() {
+function AIToolsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams?.get('q') || '';
@@ -216,3 +217,5 @@ export default function AIToolsPage() {
     </main>
   );
 }
+
+export default dynamic(() => Promise.resolve(AIToolsPage), { ssr: false });

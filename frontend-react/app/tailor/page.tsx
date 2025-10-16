@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '../../config';
+import dynamic from 'next/dynamic';
 
 interface Job {
   title: string;
@@ -20,7 +21,7 @@ interface Job {
   job_type?: string;
 }
 
-export default function TailorPage() {
+function TailorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobParam = searchParams?.get('job');
@@ -37,7 +38,7 @@ export default function TailorPage() {
   }, []);
 
   useEffect(() => {
-    if (jobParam && searchParams) {
+    if (isClient && jobParam && searchParams) {
       try {
         const jobData = JSON.parse(decodeURIComponent(jobParam));
         setJob(jobData);
@@ -47,7 +48,7 @@ export default function TailorPage() {
         setJobListing(jobParam);
       }
     }
-  }, [jobParam, searchParams]);
+  }, [isClient, jobParam, searchParams]);
 
   const handleTailor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,3 +305,5 @@ export default function TailorPage() {
     </main>
   );
 }
+
+export default dynamic(() => Promise.resolve(TailorPage), { ssr: false });

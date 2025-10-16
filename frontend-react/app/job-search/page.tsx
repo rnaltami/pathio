@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 
 const BACKEND_URL = 'https://pathio-c9yz.onrender.com';
 
@@ -21,7 +22,7 @@ interface Job {
   job_type?: string;
 }
 
-export default function JobSearchPage() {
+function JobSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams?.get('q') || '';
@@ -393,3 +394,5 @@ export default function JobSearchPage() {
     </main>
   );
 }
+
+export default dynamic(() => Promise.resolve(JobSearchPage), { ssr: false });

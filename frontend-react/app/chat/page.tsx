@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '../../config';
+import dynamic from 'next/dynamic';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-export default function ChatPage() {
+function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialQuery = searchParams?.get('q') || '';
@@ -209,3 +210,5 @@ export default function ChatPage() {
     </main>
   );
 }
+
+export default dynamic(() => Promise.resolve(ChatPage), { ssr: false });
