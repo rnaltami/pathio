@@ -30,22 +30,22 @@ export default function HomePage() {
       switch (selectedTab) {
         case 'chat':
           // Navigate to chat page with the query
-          router.push(`/chat?q=${encodeURIComponent(inputText)}`);
+          router.push(`/chat?q=${encodeURIComponent(inputText.trim())}`);
           break;
           
         case 'job-search':
           // Navigate to job search page with the query
-          router.push(`/job-search?q=${encodeURIComponent(inputText)}`);
+          router.push(`/job-search?q=${encodeURIComponent(inputText.trim())}`);
           break;
           
         case 'land-job':
           // Navigate to tailor page with the job listing
-          router.push(`/tailor?job=${encodeURIComponent(inputText)}`);
+          router.push(`/tailor?job=${encodeURIComponent(inputText.trim())}`);
           break;
           
         case 'ai-tools':
           // Navigate to AI tools page with the query
-          router.push(`/ai-tools?q=${encodeURIComponent(inputText)}`);
+          router.push(`/ai-tools?q=${encodeURIComponent(inputText.trim())}`);
           break;
       }
     } catch (error) {

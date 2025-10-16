@@ -212,10 +212,27 @@ def fetch_jsearch_jobs(query: str, location: str = None, page: int = 1, num_page
                 params["location"] = location
             print(f"JSearch API call - query: {formatted_query}, all types, country: us, location: {location}")
         elif filter_type in ["hybrid", "onsite"]:
-            # Hybrid/Onsite requires location
+            # Hybrid/Onsite requires location - explicitly turn off remote filtering
             if location:
-                params["location"] = location
-                print(f"JSearch API call - query: {formatted_query}, {filter_type} jobs, country: us, location: {location}")
+                # Try different location formats for better results
+                if location.lower() in ["los angeles", "la"]:
+                    formatted_location = "Los Angeles, CA"
+                elif location.lower() in ["new york", "nyc", "ny"]:
+                    formatted_location = "New York, NY"
+                elif location.lower() in ["seattle"]:
+                    formatted_location = "Seattle, WA"
+                elif location.lower() in ["washington", "dc"]:
+                    formatted_location = "Washington, DC"
+                else:
+                    formatted_location = location
+                
+                # Use location in query string as per API documentation
+                formatted_query = f"{formatted_query} jobs in {formatted_location}"
+                params["work_from_home"] = "false"  # Use correct parameter name
+                # Don't use separate location parameters - put everything in query string
+                print(f"JSearch API call - query: {formatted_query}, {filter_type} jobs, work_from_home: false, country: us")
+                print(f"Full JSearch API params: {params}")
+                print(f"Full JSearch API URL: {url}")
             else:
                 # Return empty for hybrid/onsite without location
                 print(f"Skipping {filter_type} search - no location provided")

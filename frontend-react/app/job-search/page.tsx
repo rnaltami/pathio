@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { API_URL } from '../../config';
+
+const BACKEND_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://pathio-c9yz.onrender.com' 
+  : 'http://localhost:8000';
 
 interface Job {
   title: string;
@@ -32,6 +35,8 @@ export default function JobSearchPage() {
   const [employmentType, setEmploymentType] = useState<string | null>(null);
   const [experienceLevel, setExperienceLevel] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState('');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [lastApiResponse, setLastApiResponse] = useState<any>(null);
 
   useEffect(() => {
     if (query) {
@@ -42,19 +47,18 @@ export default function JobSearchPage() {
   const searchJobs = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/search-jobs`, {
+      const response = await fetch(`${BACKEND_URL}/search-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           job_title: query,
-          location: locationFilter || undefined,
-          filter_type: filter,
-          employment_types: employmentType,
-          job_requirements: experienceLevel
+          filter_type: filter
         })
       });
+      
       const data = await response.json();
       setJobs(data.jobs || []);
+      setLastApiResponse(data);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -62,22 +66,32 @@ export default function JobSearchPage() {
     }
   };
 
-  const handleFilterChange = async (newFilter: string, newEmploymentType?: string, newExperienceLevel?: string) => {
+  const handleFilterChange = async (newFilter: string, newEmploymentType?: string, newExperienceLevel?: string, newLocation?: string) => {
     setLoading(true);
+    
+    // Clear jobs immediately to avoid showing stale data
+    setJobs([]);
+    
+    const searchParams = { 
+      job_title: query,
+      location: newLocation || locationFilter || undefined,
+      filter_type: newFilter,
+      employment_types: newEmploymentType || employmentType,
+      job_requirements: newExperienceLevel || experienceLevel
+    };
+    
+    console.log('Sending search params:', searchParams);
+    
     try {
-      const response = await fetch(`${API_URL}/search-jobs`, {
+      const response = await fetch(`${BACKEND_URL}/search-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          job_title: query,
-          location: locationFilter || undefined,
-          filter_type: newFilter,
-          employment_types: newEmploymentType || employmentType,
-          job_requirements: newExperienceLevel || experienceLevel
-        })
+        body: JSON.stringify(searchParams)
       });
       const data = await response.json();
       setJobs(data.jobs || []);
+      setLastApiResponse(data);
+      setLastApiResponse(data); // Store the full response for debugging
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -118,20 +132,71 @@ export default function JobSearchPage() {
           Job Search Results
         </h1>
 
+
         {loading && (
           <div className="text-center text-[0.9rem] text-[#707070] mb-6">
             Searching for jobs...
           </div>
         )}
 
-        {jobs.length > 0 && (
+        {query && (
           <>
-            <div className="mb-4 text-[0.9rem] text-[#707070] text-center">
-              {jobs.length} jobs found for "{query}"
-            </div>
+            {jobs.length > 0 && (
+              <div className="mb-4 text-[0.9rem] text-[#707070] text-center">
+                <div className="mb-2">{jobs.length} jobs found</div>
+                <div className="text-[0.8rem] space-x-2">
+                  <span className="px-2 py-1 bg-[#F0F0F0] rounded-full">"{query}"</span>
+                  {filter && filter !== 'all' && (
+                    <span className="px-2 py-1 bg-[#F0F0F0] rounded-full">{filter}</span>
+                  )}
+                  {locationFilter && (
+                    <span className="px-2 py-1 bg-[#F0F0F0] rounded-full">{locationFilter}</span>
+                  )}
+                  {employmentType && (
+                    <span className="px-2 py-1 bg-[#F0F0F0] rounded-full">{employmentType}</span>
+                  )}
+                  {experienceLevel && (
+                    <span className="px-2 py-1 bg-[#F0F0F0] rounded-full">{experienceLevel}</span>
+                  )}
+                </div>
+                
+                {/* Debug API Call Info */}
+                <div className="mt-3 p-3 bg-blue-100 rounded-lg text-left text-[0.75rem] text-gray-600">
+                  <strong>Debug - API Call Details:</strong><br/>
+                  <span className="font-mono">URL: {BACKEND_URL}/search-jobs</span><br/>
+                  <span className="font-mono">Method: POST</span><br/>
+                  <span className="font-mono">Body: {JSON.stringify({
+                    job_title: query,
+                    location: locationFilter || undefined,
+                    filter_type: filter,
+                    employment_types: employmentType || undefined,
+                    job_requirements: experienceLevel || undefined
+                  }, null, 2)}</span>
+                </div>
+                
+                {/* Debug API Response */}
+                {lastApiResponse && (
+                  <div className="mt-3 p-3 bg-green-100 rounded-lg text-left text-[0.75rem] text-gray-600">
+                    <strong>Debug - API Response:</strong><br/>
+                    <span className="font-mono">Jobs Count: {lastApiResponse.jobs?.length || 0}</span><br/>
+                    <span className="font-mono">First 3 Job Locations: {lastApiResponse.jobs?.slice(0, 3).map(job => job.location).join(', ')}</span>
+                  </div>
+                )}
+                
+                {!showFilters && (
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="mt-3 px-4 py-2 text-[0.85rem] border border-[#7C3AED] text-[#7C3AED] rounded-lg hover:bg-[#7C3AED] hover:text-white transition-all"
+                  >
+                    Filter Results
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Job Filters */}
-            <div className="mb-6 space-y-4">
+            {showFilters && (
+              <div className="mb-6 space-y-4">
               {/* Work Type Filters */}
               <div>
                 <div className="text-[0.85rem] font-semibold text-[#313338] mb-2">Work Type</div>
@@ -146,7 +211,11 @@ export default function JobSearchPage() {
                       key={workType.key}
                       onClick={() => {
                         setFilter(workType.key as any);
-                        handleFilterChange(workType.key);
+                        // Only trigger search for remote/all, or if location is provided for hybrid/onsite
+                        if (workType.key === 'remote' || workType.key === 'all' || locationFilter) {
+                          handleFilterChange(workType.key);
+                        }
+                        // For hybrid/onsite without location, just set the filter - don't clear jobs or search
                       }}
                       className={`px-3 py-1 rounded-full text-[0.85rem] transition-all ${
                         filter === workType.key
@@ -226,16 +295,24 @@ export default function JobSearchPage() {
                     type="text"
                     value={locationFilter}
                     onChange={(e) => setLocationFilter(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentLocation = e.currentTarget.value;
+                        handleFilterChange(filter, employmentType || undefined, experienceLevel || undefined, currentLocation);
+                      }
+                    }}
                     placeholder="Enter city or state..."
                     className="w-full px-3 py-2 text-[0.85rem] border border-[#E0E0E0] rounded-lg focus:outline-none focus:border-[#7C3AED]"
                   />
                 </div>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Job Listings */}
-            <div className="space-y-4">
-              {jobs.map((job, idx) => (
+            {jobs.length > 0 && (
+              <div className="space-y-4">
+                {jobs.map((job, idx) => (
                 <div key={idx} className="border border-[#E0E0E0] rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div 
                     className="text-[0.95rem] font-medium text-[#2563eb] mb-2 cursor-pointer"
@@ -245,6 +322,13 @@ export default function JobSearchPage() {
                   </div>
                   <div className="text-[0.85rem] text-[#707070] mb-2">
                     {job.company} • {job.location} • {job.type}
+                    {/* Show work type based on current filter */}
+                    <span className="ml-2 px-2 py-1 text-[0.75rem] rounded-full" style={{
+                      backgroundColor: filter === 'remote' ? '#E0F2FE' : filter === 'onsite' ? '#FEF3C7' : filter === 'hybrid' ? '#F3E8FF' : '#F3F4F6',
+                      color: filter === 'remote' ? '#0369A1' : filter === 'onsite' ? '#D97706' : filter === 'hybrid' ? '#7C3AED' : '#374151'
+                    }}>
+                      {filter === 'remote' ? '🌐 Remote' : filter === 'onsite' ? '🏢 Onsite' : filter === 'hybrid' ? '🏠 Hybrid' : 'All Types'}
+                    </span>
                     {job.salary_min && job.salary_max && (
                       <span style={{ color: '#7C3AED', fontWeight: '600' }}>
                         {' • $' + job.salary_min.toLocaleString() + ' - $' + job.salary_max.toLocaleString()}
@@ -282,13 +366,14 @@ export default function JobSearchPage() {
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            )}
           </>
         )}
 
-        {!loading && jobs.length === 0 && (
+        {!query && (
           <div className="text-center text-[0.9rem] text-[#707070] py-8">
-            No jobs found for "{query}". Try adjusting your search or filters.
+            Please enter a search query.
           </div>
         )}
       </div>
