@@ -177,7 +177,7 @@ export default function JobSearchPage() {
                   <div className="mt-3 p-3 bg-green-100 rounded-lg text-left text-[0.75rem] text-gray-600">
                     <strong>Debug - API Response:</strong><br/>
                     <span className="font-mono">Jobs Count: {lastApiResponse.jobs?.length || 0}</span><br/>
-                    <span className="font-mono">First 3 Job Locations: {lastApiResponse.jobs?.slice(0, 3).map(job => job.location).join(', ')}</span>
+                    <span className="font-mono">First 3 Job Locations: {lastApiResponse.jobs?.slice(0, 3).map((job: Job) => job.location).join(', ')}</span>
                   </div>
                 )}
                 
