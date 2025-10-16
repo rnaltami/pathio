@@ -7,7 +7,7 @@ import { API_URL } from '../../config';
 export default function AIToolsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const query = searchParams?.get('q') || '';
   
   const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

@@ -23,7 +23,7 @@ interface Job {
 export default function TailorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const jobParam = searchParams.get('job');
+  const jobParam = searchParams?.get('job');
   
   const [job, setJob] = useState<Job | null>(null);
   const [jobListing, setJobListing] = useState('');

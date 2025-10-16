@@ -12,17 +12,17 @@ interface ChatMessage {
 export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialQuery = searchParams.get('q') || '';
+  const initialQuery = searchParams?.get('q') || '';
   
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (initialQuery) {
+    if (initialQuery && searchParams) {
       handleInitialQuery();
     }
-  }, [initialQuery]);
+  }, [initialQuery, searchParams]);
 
   const handleInitialQuery = async () => {
     if (!initialQuery.trim()) return;
