@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
+import json
 import requests
 try:
     from openai import OpenAI
@@ -187,13 +188,13 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
         
         if response.status_code == 200:
             data = response.json()
+            
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             search_results = data.get("search_results", [])
+            citations = data.get("choices", [{}])[0].get("message", {}).get("citations", [])
             
-            # Debug: Print what we're getting from Perplexity
-            print(f"DEBUG - Perplexity search_results count: {len(search_results)}")
-            if search_results:
-                print(f"DEBUG - First search result: {search_results[0]}")
+            print(f"DEBUG - search_results count: {len(search_results)}")
+            print(f"DEBUG - citations count: {len(citations)}")
             
             # Parse the response for structured information
             web_results = []
@@ -213,18 +214,29 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
                         "source": "Perplexity Web Search"
                     })
             
-            # Add search results as additional sources
-            for result in search_results[:3]:  # Limit to 3 sources
-                title = result.get("title", "Web Source")
-                url = result.get("url", "")
-                snippet = result.get("snippet", "")
-                
-                web_results.append({
-                    "content": f"{title}: {snippet}" if snippet else title,
-                    "section": "Web Sources",
-                    "source": "Perplexity Web Search",
-                    "url": url
-                })
+            # Extract URLs from search_results (preferred method)
+            if search_results:
+                for result in search_results[:5]:  # Limit to 5 sources
+                    title = result.get("title", "Web Source")
+                    url = result.get("url", "")
+                    snippet = result.get("snippet", "")
+                    
+                    web_results.append({
+                        "content": f"{title}: {snippet}" if snippet else title,
+                        "section": "Web Sources",
+                        "source": "Perplexity Web Search",
+                        "url": url
+                    })
+            
+            # Extract URLs from citations (fallback method)
+            elif citations:
+                for i, citation in enumerate(citations[:5], 1):  # Limit to 5 citations
+                    web_results.append({
+                        "content": f"Source {i}",
+                        "section": "Web Sources", 
+                        "source": "Perplexity Web Search",
+                        "url": citation
+                    })
             
             return web_results[:5]  # Return top 5 results
             
