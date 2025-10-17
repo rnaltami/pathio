@@ -173,11 +173,13 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
                     "content": search_prompt
                 }
             ],
-            "max_tokens": 600,  # Reduced for faster response
+            "max_tokens": 800,  # Increased for richer responses
             "temperature": 0.1,  # Lower temperature for more focused results
             "extra_body": {
-                "search_mode": "web",
-                "search_recency_filter": "month"
+                "search_mode": "pro",  # Upgraded to Pro Search
+                "search_focus": "academic",  # Higher quality results
+                "max_results": 15,  # More comprehensive coverage
+                "search_recency_filter": "6months"  # Better recency filtering
             }
         }
         
@@ -187,6 +189,11 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
             data = response.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             search_results = data.get("search_results", [])
+            
+            # Debug: Print what we're getting from Perplexity
+            print(f"DEBUG - Perplexity search_results count: {len(search_results)}")
+            if search_results:
+                print(f"DEBUG - First search result: {search_results[0]}")
             
             # Parse the response for structured information
             web_results = []
@@ -215,7 +222,8 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
                 web_results.append({
                     "content": f"{title}: {snippet}" if snippet else title,
                     "section": "Web Sources",
-                    "source": url if url else "Web"
+                    "source": "Perplexity Web Search",
+                    "url": url
                 })
             
             return web_results[:5]  # Return top 5 results
@@ -235,7 +243,14 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
 def get_career_coaching_prompt(user_message: str, conversation_history: List[ChatMessage], market_data: Dict[str, Any], web_results: List[Dict[str, Any]]) -> str:
     """Generate a prompt for career coaching with Perplexity-style structure"""
     
-    system_prompt = """You are a career coach and job search expert. Provide rich, grounded responses like Perplexity with clear sections:
+    # Detect if user is asking for advice vs information
+    advice_keywords = ['how', 'should', 'recommend', 'advice', 'help me', 'what should i', 'next steps', 'action', 'plan']
+    user_lower = user_message.lower()
+    is_advice_request = any(keyword in user_lower for keyword in advice_keywords)
+    
+    if is_advice_request:
+        # Advice mode - include next steps
+        system_prompt = """You are a career coach and job search expert. Provide rich, grounded responses like Perplexity with clear sections:
 
 1. **Summary** - Brief overview of your response
 2. **Market Intelligence** - Use the provided market data to give specific insights about salaries, companies, and trends
@@ -251,6 +266,24 @@ CRITICAL INSTRUCTIONS:
 - The web search results are the most current and accurate information available - prioritize this over general knowledge
 - Be comprehensive and detailed - aim for 500-800 words with specific examples and data
 - Use ALL the web search results provided, not just a summary"""
+    else:
+        # Information mode - no next steps
+        system_prompt = """You are a career research assistant. Provide rich, grounded responses like Perplexity with clear sections:
+
+1. **Summary** - Brief overview of your response
+2. **Market Intelligence** - Use the provided market data to give specific insights about salaries, companies, and trends
+3. **Current Trends** - Use web search results to provide recent developments and industry insights
+4. **Key Insights** - Important facts and data points based on current market conditions
+
+CRITICAL INSTRUCTIONS:
+- You MUST incorporate the specific information from the web search results provided below
+- Quote exact numbers, dates, company names, and specific details from the web search results
+- Do NOT provide generic advice - use the current, specific information that was found through web search
+- If web search results contain specific salary ranges, company names, or recent developments, you MUST include them in your response
+- The web search results are the most current and accurate information available - prioritize this over general knowledge
+- Be comprehensive and detailed - aim for 500-800 words with specific examples and data
+- Use ALL the web search results provided, not just a summary
+- Focus on providing information and insights, not advice or next steps"""
 
     # Build conversation context
     context = ""
@@ -368,16 +401,22 @@ def chat_with_coach(request: ChatRequest):
         if market_data.get('salary_insights'):
             sources.append("Salary data from Adzuna job market")
         
-        # Add web search sources
+        # Add web search sources with clickable links
         if web_results:
-            sources.append("Current web search results from Perplexity")
+            for i, result in enumerate(web_results[:5], 1):  # Show top 5 sources
+                # Extract title from content (first 50 chars) or use section
+                title = result.get('section', '') or result.get('content', '')[:50] + "..."
+                if result.get('url'):
+                    sources.append(f"{i}. {title} - {result.get('url')}")
+                else:
+                    sources.append(f"{i}. {title} - Perplexity Search")
         
         return {
             "reply": reply,
-            "sources": sources[:3],  # Limit to 3 sources
+            "sources": sources[:5],  # Show up to 5 sources
             "next_steps": next_steps[:3],  # Limit to 3 next steps
             "market_data": market_data,  # Include raw market data
-            "web_results": web_results  # Include web search results
+            "web_results": web_results  # Include web search results with URLs
         }
         
     except Exception as e:
