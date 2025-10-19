@@ -195,26 +195,22 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
             
             print(f"DEBUG - search_results count: {len(search_results)}")
             print(f"DEBUG - citations count: {len(citations)}")
+            if search_results:
+                print(f"DEBUG - First search result: {search_results[0]}")
+            if citations:
+                print(f"DEBUG - First citation: {citations[0]}")
+            
+            # Write debug info to file for inspection
+            with open('/tmp/perplexity_debug.txt', 'w') as f:
+                f.write(f"search_results count: {len(search_results)}\n")
+                f.write(f"citations count: {len(citations)}\n")
+                f.write(f"search_results: {json.dumps(search_results, indent=2)}\n")
+                f.write(f"citations: {json.dumps(citations, indent=2)}\n")
             
             # Parse the response for structured information
             web_results = []
             
-            # First, extract key insights from the main content
-            lines = content.split('\n')
-            current_section = ""
-            
-            for line in lines:
-                line = line.strip()
-                if line.startswith('**') and line.endswith('**'):
-                    current_section = line.replace('**', '')
-                elif line and not line.startswith('[') and len(line) > 20:
-                    web_results.append({
-                        "content": line,
-                        "section": current_section,
-                        "source": "Perplexity Web Search"
-                    })
-            
-            # Extract URLs from search_results (preferred method)
+            # Extract URLs from search_results (this is where the URLs actually are!)
             if search_results:
                 for result in search_results[:5]:  # Limit to 5 sources
                     title = result.get("title", "Web Source")
@@ -228,7 +224,7 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
                         "url": url
                     })
             
-            # Extract URLs from citations (fallback method)
+            # Extract URLs from citations (fallback method - rarely used)
             elif citations:
                 for i, citation in enumerate(citations[:5], 1):  # Limit to 5 citations
                     web_results.append({
@@ -252,6 +248,41 @@ def fetch_perplexity_web_results(message: str) -> List[Dict[str, Any]]:
     
     return []
 
+def synthesize_web_results(web_results: List[Dict[str, Any]]) -> str:
+    """Synthesize web results into structured insights before sending to LLM"""
+    if not web_results:
+        return ""
+    
+    # Categorize results by type
+    roles = []
+    salary = []
+    trends = []
+    companies = []
+    
+    for result in web_results:
+        content = result.get('content', '').lower()
+        if any(word in content for word in ['job', 'role', 'position', 'career', 'hiring']):
+            roles.append(result.get('content', ''))
+        elif any(word in content for word in ['salary', 'pay', 'compensation', 'wage']):
+            salary.append(result.get('content', ''))
+        elif any(word in content for word in ['trend', 'growth', 'market', 'industry']):
+            trends.append(result.get('content', ''))
+        elif any(word in content for word in ['company', 'employer', 'organization']):
+            companies.append(result.get('content', ''))
+    
+    # Build structured summary
+    summary_parts = []
+    if roles:
+        summary_parts.append(f"Job Opportunities: {'; '.join(roles[:3])}")
+    if salary:
+        summary_parts.append(f"Salary Data: {'; '.join(salary[:2])}")
+    if trends:
+        summary_parts.append(f"Market Trends: {'; '.join(trends[:2])}")
+    if companies:
+        summary_parts.append(f"Company Insights: {'; '.join(companies[:2])}")
+    
+    return "\n".join(summary_parts)
+
 def get_career_coaching_prompt(user_message: str, conversation_history: List[ChatMessage], market_data: Dict[str, Any], web_results: List[Dict[str, Any]]) -> str:
     """Generate a prompt for career coaching with Perplexity-style structure"""
     
@@ -262,40 +293,59 @@ def get_career_coaching_prompt(user_message: str, conversation_history: List[Cha
     
     if is_advice_request:
         # Advice mode - include next steps
-        system_prompt = """You are a career coach and job search expert. Provide rich, grounded responses like Perplexity with clear sections:
+        system_prompt = """You are a career research assistant. Format your response EXACTLY like this:
 
-1. **Summary** - Brief overview of your response
-2. **Market Intelligence** - Use the provided market data to give specific insights about salaries, companies, and trends
-3. **Current Trends** - Use web search results to provide recent developments and industry insights
-4. **Career Insights** - Key insights and actionable advice based on current market conditions
-5. **Next Steps** - Specific, actionable steps the user can take
+**Summary**
+[2-3 sentences about the topic]
 
-CRITICAL INSTRUCTIONS:
-- You MUST incorporate the specific information from the web search results provided below
-- Quote exact numbers, dates, company names, and specific details from the web search results
-- Do NOT provide generic advice - use the current, specific information that was found through web search
-- If web search results contain specific salary ranges, company names, or recent developments, you MUST include them in your response
-- The web search results are the most current and accurate information available - prioritize this over general knowledge
-- Be comprehensive and detailed - aim for 500-800 words with specific examples and data
-- Use ALL the web search results provided, not just a summary"""
+**Key Insights**
+- [Bullet point 1]
+- [Bullet point 2]
+- [Bullet point 3]
+
+**Current Trends**
+- [Trend 1]
+- [Trend 2]
+
+**Market Intelligence**
+- [Salary data]
+- [Company info]
+
+**Next Steps**
+- [Action 1]
+- [Action 2]
+- [Action 3]
+
+RULES:
+- Use bullet points (-) for all lists
+- No paragraphs, only bullet points
+- No source references in content
+- Maximum 300 words"""
     else:
         # Information mode - no next steps
-        system_prompt = """You are a career research assistant. Provide rich, grounded responses like Perplexity with clear sections:
+        system_prompt = """You are a career research assistant. Format your response EXACTLY like this:
 
-1. **Summary** - Brief overview of your response
-2. **Market Intelligence** - Use the provided market data to give specific insights about salaries, companies, and trends
-3. **Current Trends** - Use web search results to provide recent developments and industry insights
-4. **Key Insights** - Important facts and data points based on current market conditions
+**Summary**
+[2-3 sentences about the topic]
 
-CRITICAL INSTRUCTIONS:
-- You MUST incorporate the specific information from the web search results provided below
-- Quote exact numbers, dates, company names, and specific details from the web search results
-- Do NOT provide generic advice - use the current, specific information that was found through web search
-- If web search results contain specific salary ranges, company names, or recent developments, you MUST include them in your response
-- The web search results are the most current and accurate information available - prioritize this over general knowledge
-- Be comprehensive and detailed - aim for 500-800 words with specific examples and data
-- Use ALL the web search results provided, not just a summary
-- Focus on providing information and insights, not advice or next steps"""
+**Key Insights**
+- [Bullet point 1]
+- [Bullet point 2]
+- [Bullet point 3]
+
+**Current Trends**
+- [Trend 1]
+- [Trend 2]
+
+**Market Intelligence**
+- [Salary data]
+- [Company info]
+
+RULES:
+- Use bullet points (-) for all lists
+- No paragraphs, only bullet points
+- No source references in content
+- Maximum 250 words"""
 
     # Build conversation context
     context = ""
@@ -323,17 +373,13 @@ CRITICAL INSTRUCTIONS:
         if market_data.get('trending_industries'):
             market_context += f"Trending industries: {', '.join(market_data['trending_industries'])}\n"
     
-    # Add web results context
+    # Add synthesized web results context
     web_context = ""
     if web_results:
-        web_context = "\n\n🔥 CURRENT WEB SEARCH RESULTS (MUST USE THESE IN YOUR RESPONSE):\n"
-        web_context += "These are the most current and accurate details you MUST incorporate:\n\n"
-        for i, result in enumerate(web_results, 1):
-            if result.get('section'):
-                web_context += f"RESULT {i} - {result['section']}: {result['content']}\n\n"
-            else:
-                web_context += f"RESULT {i}: {result['content']}\n\n"
-        web_context += "REMEMBER: You MUST use the specific details, numbers, and information from these web search results in your response.\n"
+        synthesized_results = synthesize_web_results(web_results)
+        if synthesized_results:
+            web_context = f"\n\nCURRENT WEB SEARCH INSIGHTS:\n{synthesized_results}\n"
+            web_context += "Use these specific insights in your response, but do NOT include source references in your content.\n"
     
     return f"{system_prompt}{market_context}\n\nUser's current question: {user_message}{context}\n\n{web_context}"
 
@@ -383,45 +429,36 @@ def chat_with_coach(request: ChatRequest):
         sources = []
         next_steps = []
         
-        # Look for sources and next steps in the response
+        # Look for next steps in the response
         lines = reply.split('\n')
-        in_sources = False
         in_next_steps = False
         
         for line in lines:
             line = line.strip()
-            if 'sources' in line.lower() or 'references' in line.lower():
-                in_sources = True
-                in_next_steps = False
-                continue
-            elif 'next steps' in line.lower() or 'action items' in line.lower():
+            if 'next steps' in line.lower() or 'action items' in line.lower():
                 in_next_steps = True
-                in_sources = False
                 continue
             elif line.startswith('#') or line.startswith('**'):
-                in_sources = False
                 in_next_steps = False
                 continue
-            elif in_sources and line.startswith('-'):
-                sources.append(line[1:].strip())
             elif in_next_steps and line.startswith('-'):
                 next_steps.append(line[1:].strip())
+        
+        # Build sources list with web search results (these have actual URLs)
+        if web_results:
+            for i, result in enumerate(web_results[:5], 1):  # Show top 5 sources
+                # Extract title from content (first 50 chars) or use section
+                title = result.get('content', '')[:50] + "..." if len(result.get('content', '')) > 50 else result.get('content', '')
+                if result.get('url'):
+                    sources.append(f"{i}. {title} - {result.get('url')}")
+                else:
+                    sources.append(f"{i}. {title} - Perplexity Search")
         
         # Add market data sources
         if market_data.get('top_companies'):
             sources.append(f"Top hiring companies: {', '.join(market_data['top_companies'][:3])}")
         if market_data.get('salary_insights'):
             sources.append("Salary data from Adzuna job market")
-        
-        # Add web search sources with clickable links
-        if web_results:
-            for i, result in enumerate(web_results[:5], 1):  # Show top 5 sources
-                # Extract title from content (first 50 chars) or use section
-                title = result.get('section', '') or result.get('content', '')[:50] + "..."
-                if result.get('url'):
-                    sources.append(f"{i}. {title} - {result.get('url')}")
-                else:
-                    sources.append(f"{i}. {title} - Perplexity Search")
         
         return {
             "reply": reply,
