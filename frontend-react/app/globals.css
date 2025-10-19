@@ -1,80 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-  
-  body {
-    color: #202020;
-    background: #FFFFFF;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    margin: 0;
-    padding: 0;
-  }
-  
-  * {
-    margin: 0;
-    padding: 0;
-  }
-}
-
-/* Consistent container width across all pages */
-@layer components {
-  .container-width {
-    max-width: 720px;
-  }
-}
-
-@layer utilities {
-  /* Force our custom styles to take precedence */
-  .search-input {
-    padding: 1rem 1.25rem 1rem 1.25rem !important;
-    padding-right: 3rem !important;
-  }
-  
-  .submit-button {
-    position: absolute !important;
-    right: 0.5rem !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    width: 2rem !important;
-    height: 2rem !important;
-    background: #2563eb !important;
-    border-radius: 0.5rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border: none !important;
-    cursor: pointer !important;
-  }
-  
-  .submit-button:hover {
-    background: #1d4ed8 !important;
-  }
-}
-
-/* Animations */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes slideUp {
+@keyframes slide-up {
   from {
-    transform: translateY(20px);
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
