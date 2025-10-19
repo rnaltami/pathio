@@ -24,7 +24,7 @@ def jobs_health():
     }
 
 def fetch_jsearch_jobs(query: str, location: str = None, job_type: str = None):
-    """Fetch jobs from JSearch API"""
+    """Fetch jobs from JSearch API (RapidAPI version)"""
     if not JSEARCH_API_KEY:
         return []
     
@@ -32,8 +32,7 @@ def fetch_jsearch_jobs(query: str, location: str = None, job_type: str = None):
     search_params = {
         "query": query,
         "page": 1,
-        "num_pages": 3,
-        "api_key": JSEARCH_API_KEY
+        "num_pages": 3
     }
     
     # Add location to query if provided
@@ -42,9 +41,9 @@ def fetch_jsearch_jobs(query: str, location: str = None, job_type: str = None):
     
     # Set remote work preference
     if job_type == "remote":
-        search_params["remote_jobs_only"] = True
+        search_params["work_from_home"] = True
     elif job_type in ["hybrid", "onsite"]:
-        search_params["remote_jobs_only"] = False
+        search_params["work_from_home"] = False
         if location:
             search_params["query"] = f"{query} jobs in {location}"
     
