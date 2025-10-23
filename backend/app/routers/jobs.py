@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 import requests
 import os
 from dotenv import load_dotenv
@@ -8,98 +9,75 @@ load_dotenv()
 
 router = APIRouter()
 
-JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY")
+# Adzuna configuration
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
+ADZUNA_API_KEY = os.getenv("ADZUNA_API_KEY")
 
 class JobSearchRequest(BaseModel):
     query: str
-    location: str = None
-    job_type: str = None
+    location: Optional[str] = None
 
 @router.get("/jobs/health")
 def jobs_health():
-    """Check if JSearch API is configured"""
+    """Check if Adzuna API is configured"""
     return {
-        "jsearch_configured": bool(JSEARCH_API_KEY),
-        "status": "healthy" if JSEARCH_API_KEY else "missing_api_key"
+        "adzuna_configured": bool(ADZUNA_APP_ID and ADZUNA_API_KEY),
+        "status": "healthy" if (ADZUNA_APP_ID and ADZUNA_API_KEY) else "missing_api_key"
     }
-
-def fetch_jsearch_jobs(query: str, location: str = None, job_type: str = None):
-    """Fetch jobs from JSearch API (RapidAPI version)"""
-    if not JSEARCH_API_KEY:
-        return []
-    
-    # Build search parameters
-    search_params = {
-        "query": query,
-        "page": 1,
-        "num_pages": 3
-    }
-    
-    # Add location to query if provided
-    if location:
-        search_params["query"] = f"{query} in {location}"
-    
-    # Set remote work preference
-    if job_type == "remote":
-        search_params["work_from_home"] = True
-    elif job_type in ["hybrid", "onsite"]:
-        search_params["work_from_home"] = False
-        if location:
-            search_params["query"] = f"{query} jobs in {location}"
-    
-    try:
-        url = "https://jsearch.p.rapidapi.com/search"
-        headers = {
-            "X-RapidAPI-Key": JSEARCH_API_KEY,
-            "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
-        }
-        
-        response = requests.get(url, headers=headers, params=search_params, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            jobs_data = data.get("data", [])
-            
-            processed_jobs = []
-            for job in jobs_data:
-                # Safely handle location concatenation
-                city = job.get("job_city", "") or ""
-                state = job.get("job_state", "") or ""
-                location = f"{city}, {state}".strip(", ") if city or state else "Remote"
-                
-                processed_job = {
-                    "title": job.get("job_title", ""),
-                    "company": job.get("employer_name", ""),
-                    "location": location,
-                    "type": job.get("job_employment_type", ""),
-                    "description": job.get("job_description", ""),
-                    "url": job.get("job_apply_link", ""),
-                    "salary_min": job.get("job_min_salary"),
-                    "salary_max": job.get("job_max_salary"),
-                    "job_type": job_type or "all"
-                }
-                processed_jobs.append(processed_job)
-            
-            return processed_jobs
-        else:
-            print(f"JSearch API error: {response.status_code}")
-            return []
-            
-    except Exception as e:
-        print(f"Error fetching jobs from JSearch: {e}")
-        return []
 
 @router.post("/jobs/search")
 def search_jobs(request: JobSearchRequest):
-    """Search for jobs using JSearch API"""
+    """Search for jobs - COMPLETELY FRESH START"""
     
-    if not JSEARCH_API_KEY:
-        raise HTTPException(status_code=500, detail="JSearch API key not configured")
+    if not ADZUNA_APP_ID or not ADZUNA_API_KEY:
+        raise HTTPException(status_code=500, detail="Adzuna API keys not configured")
     
     try:
-        jobs = fetch_jsearch_jobs(request.query, request.location, request.job_type)
-        return {"jobs": jobs, "total": len(jobs)}
+        # Simple API call - search with separate query and location
+        params = {
+            "app_id": ADZUNA_APP_ID,
+            "app_key": ADZUNA_API_KEY,
+            "what": request.query,
+            "results_per_page": 50
+        }
         
+        if request.location:
+            params["where"] = request.location
+        else:
+            # If no location provided, search for remote jobs
+            params["what"] = request.query + " remote"
+        
+        print(f"Searching for: '{request.query}' in '{request.location}'")
+        
+        url = "https://api.adzuna.com/v1/api/jobs/us/search/1"
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            jobs = data.get("results", [])
+            
+            # Simple job processing
+            processed_jobs = []
+            for job in jobs:
+                processed_job = {
+                    "title": job.get("title", ""),
+                    "company": job.get("company", {}).get("display_name", ""),
+                    "location": job.get("location", {}).get("display_name", ""),
+                    "type": job.get("contract_type", ""),
+                    "description": job.get("description", ""),
+                    "url": job.get("redirect_url", ""),
+                    "salary_min": job.get("salary_min"),
+                    "salary_max": job.get("salary_max"),
+                    "posted_at": job.get("created", "")
+                }
+                processed_jobs.append(processed_job)
+            
+            print(f"Found {len(processed_jobs)} jobs")
+            return {"jobs": processed_jobs, "total": len(processed_jobs)}
+        else:
+            print(f"API error: {response.status_code}")
+            return {"jobs": [], "total": 0}
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Job search failed: {str(e)}")
-
+        print(f"Error: {e}")
+        return {"jobs": [], "total": 0}

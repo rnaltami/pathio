@@ -245,3 +245,4 @@ pkill -f next
 - Sources are clickable
 - Market data displays
 - No timeout errors
+

@@ -19,10 +19,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         {/* Global Header - Integrated */}
-        <div className="bg-black">
+        <div className="bg-white border-b border-gray-200">
           <div className="px-6 py-6">
             <div className="flex items-center">
-              <Link href="/?reset=true" className="text-[1.6rem] font-black text-white hover:text-purple-400 transition-colors">
+              <Link href="/?reset=true" className="text-[1.6rem] font-black text-gray-900 hover:text-purple-400 transition-colors">
                 pathio
               </Link>
             </div>

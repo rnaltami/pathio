@@ -83,3 +83,4 @@ const formatPerplexityResponse = (text: string) => {
 
 ## Rollback Plan
 If the fix doesn't work, restore this exact function to lines 67-134 in frontend-react/app/page.tsx
+

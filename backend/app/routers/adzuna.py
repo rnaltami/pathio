@@ -91,3 +91,4 @@ async def get_market_insights():
     data = response.json()
     return {"market_insights": data.get("results", [])}
 
+

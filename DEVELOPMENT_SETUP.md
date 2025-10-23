@@ -107,3 +107,4 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 ### Chat API Issues:
 - Use deployed backend temporarily
 - Or fix local architecture issue
+

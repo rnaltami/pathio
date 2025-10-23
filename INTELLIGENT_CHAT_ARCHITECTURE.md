@@ -212,3 +212,4 @@ ADZUNA_APP_KEY=your_adzuna_app_key_here
 - Background data refresh
 - Optimized API call batching
 - CDN for static assets
+

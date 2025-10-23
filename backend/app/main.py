@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 import json
 from dotenv import load_dotenv
-from app.routers import jobs
+from app.routers import jobs, analytics, ai_tools, help_me_apply
 
 load_dotenv()
 
@@ -15,6 +15,9 @@ app = FastAPI()
 
 # Include routers
 app.include_router(jobs.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
+app.include_router(ai_tools.router, prefix="/api")
+app.include_router(help_me_apply.router, prefix="/api")
 
 # CORS middleware
 app.add_middleware(
@@ -34,6 +37,12 @@ class ChatResponse(BaseModel):
     market_data: dict
     sources: list
     web_results: list
+
+class AIToolsRequest(BaseModel):
+    query: str
+
+class AIToolsResponse(BaseModel):
+    response: str
 
 # Initialize OpenAI client
 openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -148,6 +157,34 @@ def synthesize_web_results(perplexity_data: dict, adzuna_data: dict) -> str:
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
+        # Smart filter for non-career questions
+        message_lower = request.message.lower().strip()
+        
+        # Conversational responses that don't need career analysis
+        conversational_patterns = [
+            "thanks", "thank you", "hi", "hello", "hey", "goodbye", "bye",
+            "how are you", "what's up", "nice", "cool", "awesome", "great",
+            "ok", "okay", "sure", "yes", "no", "maybe", "haha", "lol",
+            "i didn't know that", "oh interesting", "that's helpful", 
+            "good to know", "makes sense", "i see", "got it",
+            "is that for later", "when will that be", "what about",
+            "sounds good", "perfect", "exactly", "right", "true"
+        ]
+        
+        # Check if message is primarily conversational
+        is_conversational = any(pattern in message_lower for pattern in conversational_patterns)
+        is_short_response = len(message_lower.split()) <= 5
+        has_question_mark = "?" in request.message
+        
+        # If it's conversational and either short OR doesn't have a question mark, treat as casual
+        if is_conversational and (is_short_response or not has_question_mark):
+            return ChatResponse(
+                reply="You're welcome! I'm here to help with your career questions. Feel free to ask me about job opportunities, salary insights, industry trends, or career advice anytime!",
+                market_data={},
+                sources=[],
+                web_results=[]
+            )
+        
         # Run Perplexity and Adzuna in parallel
         perplexity_task = asyncio.create_task(fetch_perplexity_web_results(request.message))
         adzuna_task = asyncio.create_task(fetch_adzuna_market_data(request.message))
@@ -212,6 +249,35 @@ Provide a structured response following the exact format specified in the system
             market_data={},
             sources=[],
             web_results=[]
+        )
+
+@app.post("/api/ai-tools", response_model=AIToolsResponse)
+async def ai_tools(request: AIToolsRequest):
+    try:
+        # Direct OpenAI call for AI tools recommendations
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert AI tools consultant. When asked about AI tools for a specific task, provide a comprehensive list of relevant tools. For each tool, include: 1) Tool name, 2) Brief description, 3) What it's good for, 4) Where to find it (website/platform), 5) Pricing info if known. Format your response as plain text with clear sections and bullet points. Do NOT use markdown formatting like **bold** or *italic*. Include full URLs for websites."
+                },
+                {
+                    "role": "user",
+                    "content": f"I need AI tools for: {request.query}. Please provide a comprehensive list of AI tools that can help with this task."
+                }
+            ],
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        return AIToolsResponse(
+            response=response.choices[0].message.content
+        )
+    
+    except Exception as e:
+        return AIToolsResponse(
+            response=f"Sorry, I encountered an error while searching for AI tools: {str(e)}"
         )
 
 if __name__ == "__main__":
