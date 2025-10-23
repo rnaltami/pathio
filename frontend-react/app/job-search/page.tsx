@@ -45,7 +45,7 @@ function JobSearchContent() {
       setJobType(urlRemote === 'true' ? 'remote' : 'all')
       
       // Auto-search when URL parameters are present
-      performSearch(urlQuery, urlLocation || '')
+      performSearch(urlQuery, urlLocation || '', urlRemote === 'true' ? 'remote' : 'all')
     }
   }, [])
 
